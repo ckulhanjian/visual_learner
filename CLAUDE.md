@@ -99,7 +99,8 @@ Do not weaken these without an explicit decision recorded in `docs/DECISIONS.md`
 - **Color:** NYC subway lines as category identity. Physics `#EE352E`, Signals &
   Systems `#0039A6`, Programming `#00933C`, Circuits `#FF6319`. Reserve `#B933AD`
   and `#FCCC0A`.
-- **Light and dark both first-class.** Light is paper cream, dark is near-black.
+- **Light and dark both first-class.** Light is paper cream, dark is charcoal —
+  not pure black.
 - **Navigation** is two surfaces: an infinitely-wrapping category spinner with a
   blue dot marker (home page, wheel/arrow-key driven — see `docs/DECISIONS.md`),
   and a separate tree dropdown in the header backed by `topics`.

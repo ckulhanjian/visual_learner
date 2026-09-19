@@ -255,17 +255,24 @@ instead of forcing one into multipart encoding it does not need.
 
 Two nav surfaces, not one:
 
-- **`CategorySpinner`** — a vertical, infinitely-wrapping list bottom-right.
-  Driven by wheel delta and arrow keys (not real page scroll — the page
-  itself doesn't move), with a blue dot marking whichever category is
-  centered. See `docs/DECISIONS.md` for why it isn't real scroll.
-- **`CategoryTreeNav`** — the header's expandable tree dropdown, backed by
+- **`CategorySpinner`** — categories arranged on a true circle whose center
+  sits off-screen at the container's right edge, bottom-right, infinitely
+  wrapping. Driven by wheel delta and arrow keys (not real page scroll — the
+  page itself doesn't move), with a blue dot marking whichever category is
+  centered. See `docs/DECISIONS.md` for the geometry and why it isn't real
+  scroll.
+- **`CategoryTreeNav`** — a Khan Academy–style two-column header dropdown
+  (categories on the left, a scrollable topic list on the right), backed by
   `GET /topics`. Category → topic → sub-topic, as deep as the data goes.
 
-Whichever category is centered in the spinner drives a left-side panel (below
-the title/blurb) showing that category's most recent three published
-visuals, each with a stubbed "+" — `/c/:slug` doesn't exist yet, so it's
-disabled rather than a dead link.
+Whichever category is centered in the spinner drives a 4-column preview grid
+(below the title/blurb) of that category's most recent three published
+visuals plus a stubbed `ExpandCell` as the 4th slot — `/c/:slug` doesn't
+exist yet, so it's disabled rather than a dead link. No separate heading
+names the active category above the grid; the spinner and tree nav already
+show that.
+
+The footer carries a copyright line and a link to the repo.
 
 ### `/v/:slug`
 
@@ -295,7 +302,8 @@ src/
   api/          one module per endpoint group; only place fetch appears
   domain/       Visual, Category, Tag, Topic — types and logic on them
   renderers/    one file per kind; the registry mapping kind → renderer
-  components/   ConceptForm, CategorySpinner, CategoryTreeNav, VisualPreviewCard, MarkdownBody
+  components/   ConceptForm, CategorySpinner, CategoryTreeNav, VisualPreviewCard,
+                ExpandCell, SiteFooter, MarkdownBody
   pages/        one file per route, mostly composing the above
   theme/        tokens, subway palette, dark mode
 ```

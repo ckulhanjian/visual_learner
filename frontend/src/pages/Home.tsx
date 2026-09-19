@@ -4,7 +4,8 @@ import { fetchCategoryTopics } from '../api/topics'
 import { fetchVisualsByCategory } from '../api/visuals'
 import { CategorySpinner } from '../components/CategorySpinner'
 import { CategoryTreeNav } from '../components/CategoryTreeNav'
-import { ConnectionCheck } from '../components/ConnectionCheck'
+import { ExpandCell } from '../components/ExpandCell'
+import { SiteFooter } from '../components/SiteFooter'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { VisualPreviewCard } from '../components/VisualPreviewCard'
 import type { Category } from '../domain/Category'
@@ -101,7 +102,7 @@ export function Home() {
 
       <main className="relative flex flex-1 flex-col gap-10 px-6 py-16">
         <div className="mx-auto max-w-xl space-y-3 text-center">
-          <h1 className="font-mono text-2xl tracking-tight md:text-3xl">A personal atlas of visualizations</h1>
+          <h1 className="font-body text-3xl italic md:text-4xl">A personal atlas of visualizations</h1>
           <p className="text-ink-muted">
             Physics, signals and systems, programming, circuits — written by hand, generated,
             or uploaded, each with the math and the story behind it.
@@ -109,36 +110,25 @@ export function Home() {
         </div>
 
         <div className="mx-auto w-full max-w-xl text-left">
-          {activeCategory && (
-            <div className="mb-3 flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: activeCategory.color }} />
-              <h2 className="font-mono text-sm tracking-wide uppercase" style={{ color: activeCategory.color }}>
-                {activeCategory.name}
-              </h2>
-              <button
-                type="button"
-                disabled
-                aria-disabled="true"
-                title="Category pages aren't built yet"
-                className="text-ink-muted border-line ml-auto rounded-full border px-2 py-0.5 font-mono text-xs opacity-50"
-              >
-                + Expand
-              </button>
-            </div>
-          )}
-
           {previewState.status === 'loading' && <p className="text-ink-muted font-mono text-xs">Loading…</p>}
           {previewState.status === 'error' && (
             <p className="font-mono text-xs text-red-700 dark:text-red-400">{previewState.message}</p>
           )}
-          {previewState.status === 'ready' && previewState.data.length === 0 && (
-            <p className="text-ink-muted font-mono text-xs">Nothing published here yet.</p>
-          )}
-          {previewState.status === 'ready' && previewState.data.length > 0 && (
-            <ul className="m-0 flex list-none flex-col gap-2 p-0">
-              {previewState.data.map((visual) => (
-                <VisualPreviewCard key={visual.slug} visual={visual} />
-              ))}
+          {previewState.status === 'ready' && activeCategory && (
+            <ul className="m-0 grid grid-cols-2 gap-3 p-0 sm:grid-cols-4">
+              {Array.from({ length: PREVIEW_COUNT }, (_, i) => previewState.data[i] ?? null).map((visual, i) =>
+                visual ? (
+                  <VisualPreviewCard key={visual.slug} visual={visual} />
+                ) : (
+                  <li
+                    key={`empty-${i}`}
+                    className="border-line text-ink-muted flex aspect-square items-center justify-center rounded-lg border border-dashed font-mono text-[10px] uppercase"
+                  >
+                    Empty
+                  </li>
+                ),
+              )}
+              <ExpandCell categoryColor={activeCategory.color} />
             </ul>
           )}
         </div>
@@ -158,7 +148,7 @@ export function Home() {
       </main>
 
       <footer className="border-line flex justify-center border-t px-6 py-5">
-        <ConnectionCheck />
+        <SiteFooter />
       </footer>
     </div>
   )

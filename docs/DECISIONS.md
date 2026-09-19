@@ -90,8 +90,23 @@ both nudge a continuous value that's taken `mod categories.length`. The page
 trades its native scroll for this on `/`, which is a deliberate tradeoff, not
 an oversight — the spinner *is* the page's primary interaction here.
 
-**`CategoryTreeNav`** (header, all pages once it's wired up elsewhere).
-A separate, ordinary expandable tree backed by the new `topics` table (see
+Geometry: a true circle whose center sits off-screen at the container's right
+edge, so the selected category always sits at the circle's leftmost point and
+categories before/after it swing up-and-right / down-and-right around it.
+Adjacent categories are a **fixed** angular step apart (`ANGLE_STEP_DEGREES`
+in `CategorySpinner.tsx`), not `360 / count` — dividing the full circle
+evenly among as few as 4 categories would put immediate neighbors 90° from
+the selected item, i.e. fully vertical, unreadable text. "No duplicates"
+means exactly one point per category, not that they have to span the whole
+circle. Wraparound needs no special-casing here: angles are periodic, so
+rotating past a full lap is already seamless — unlike the earlier
+slot-based approach this replaced, which needed a fractional-offset trick to
+fake the same continuity.
+
+**`CategoryTreeNav`** (header). A Khan Academy–style two-column menu: a
+fixed left list of categories, and a right pane — its own header plus a
+`max-h` + `overflow-y-auto` scrollable topic list — that swaps to whichever
+category is selected on the left. Backed by the `topics` table (see
 `docs/ARCHITECTURE.md` §2) — `Programming > Data Structures > Stack`, as deep
 as the data goes. Not the same job as the spinner: this is direct lookup for
 someone who already knows what they want, the spinner is for browsing.
@@ -101,9 +116,13 @@ is explicitly not decided.** The four existing categories and their subway
 colors are unchanged. `topics` nest *within* a category; they don't let a
 category nest inside another one.
 
-**The expand button on the top-3 preview is stubbed.** `/c/:slug` isn't
-built, so it renders disabled rather than as a dead link. No router yet,
-per above.
+**The top-3 preview is a 4-column grid** (2 columns below `sm`), not a
+vertical list — visual cards fill the first slots, an `ExpandCell` is always
+the last one. No separate category-name heading above it either: the spinner
+and tree nav already say which category is active, so repeating it there was
+redundant. `ExpandCell` is disabled rather than a dead link — `/c/:slug`
+isn't built, so there's nowhere for it to go yet. No router either, per
+above.
 
 ---
 
