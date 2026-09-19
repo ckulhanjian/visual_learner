@@ -17,8 +17,8 @@ submit is visible until it is reviewed.
 
 | | |
 |---|---|
-| Backend | Built and verified. Flask + SQLAlchemy + Marshmallow, SQLite. |
-| Frontend | Not started. React + TypeScript + Vite + Tailwind v4. |
+| Backend | Flask + SQLAlchemy + Marshmallow, SQLite. |
+| Frontend | Plain HTML/JS test page only, to exercise the API. React + TypeScript + Vite + Tailwind v4 not started. |
 | Deferred | Vega-Lite and the `/create` editor page, p5.js, Postgres, Alembic. |
 
 ## Commands
