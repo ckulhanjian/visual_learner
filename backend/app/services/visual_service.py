@@ -91,13 +91,17 @@ class VisualService:
             status=Status.PUBLISHED if trusted else Status.PENDING,
             category=category,
         )
+        # Register with the session before anything below triggers an autoflush
+        # (TagService's lookup queries do): otherwise SQLAlchemy tries to flush
+        # the category->visual backref for a visual the session doesn't know yet.
+        db.session.add(visual)
+
         visual.tags = TagService.get_or_create_many(data.get("tags", []))
         visual.resources = [
             Resource(label=r["label"], url=r["url"], kind=r.get("kind", "other"))
             for r in data.get("resources", [])
         ]
 
-        db.session.add(visual)
         db.session.commit()
         return visual
 
