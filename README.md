@@ -18,8 +18,15 @@ python run.py seed
 python run.py            # http://localhost:5001/api/v1/health
 ```
 
-A plain HTML/JS page (`frontend-test/index.html`) exercises the API for manual
-testing. The real React frontend is not built yet.
+```bash
+cd frontend
+npm install
+npm run dev               # http://localhost:5173, proxies /api to Flask
+```
+
+Only the home page exists in the real frontend so far. A plain HTML/JS page
+(`frontend-test/index.html`) also exercises the API directly, for raw
+endpoint testing outside the React app.
 
 ## Documentation
 
@@ -29,6 +36,7 @@ testing. The real React frontend is not built yet.
 | `docs/ARCHITECTURE.md` | data dictionary, routes, pages, renderer registry |
 | `docs/DECISIONS.md` | why things are this way, what is open, what is deferred |
 | `backend/README.md` | backend setup and endpoint reference |
+| `frontend/README.md` | frontend setup and layout |
 
 ## Stack
 

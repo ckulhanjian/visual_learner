@@ -18,7 +18,7 @@ submit is visible until it is reviewed.
 | | |
 |---|---|
 | Backend | Flask + SQLAlchemy + Marshmallow, SQLite. |
-| Frontend | Plain HTML/JS test page only, to exercise the API. React + TypeScript + Vite + Tailwind v4 not started. |
+| Frontend | React + TypeScript + Vite + Tailwind v4. Home page only (arc nav, theme, layout) — the other four routes aren't built. Plain HTML/JS test page (`frontend-test/`) still around for raw API poking. |
 | Deferred | Vega-Lite and the `/create` editor page, p5.js, Postgres, Alembic. |
 
 ## Commands

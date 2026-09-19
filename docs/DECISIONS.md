@@ -55,6 +55,26 @@ Flask on **5001**, not 5000 — macOS binds 5000 to the AirPlay Receiver and the
 failure mode is a silent 403 from a service you did not know was running. Vite on
 5173, proxying `/api` to Flask.
 
+### Theme default
+
+**Paper cream first.** The site loads light unless the visitor has toggled to
+dark before (persisted in `localStorage`, read before first paint to avoid a
+flash of the wrong theme — see `frontend/index.html`). Both stay first-class;
+this only decides the unauthenticated starting point.
+
+### Frontend fonts
+
+Self-hosted via `@fontsource`, latin-only subsets — pulling the default
+`400.css` etc. drags in cyrillic/greek/vietnamese subsets nothing here needs
+and roughly quadruples the CSS payload for no visible difference.
+
+### No router yet
+
+`react-router-dom` isn't installed. `src/App.tsx` renders `Home` directly.
+Adding a router before a second page exists to route to is exactly the kind
+of premature abstraction this repo's conventions warn against; it goes in
+when `/c/:slug` (or another route from §6) is actually built.
+
 ---
 
 ## 2. Visualization libraries
@@ -198,9 +218,10 @@ thumbnails on upload means adding an image pipeline. Placeholder tiles, or worth
 the dependency?
 
 **2. Arc navigation scope.** Categories on the home page *and* topic titles on the
-category page, or just the home page with a plain grid underneath?
-
-**3. Dark mode default.** Paper cream first, or near-black first?
+category page, or just the home page with a plain grid underneath? Still open —
+the home page's `ArcNav` (`frontend/src/components/ArcNav.tsx`) only renders
+categories today; whether the same treatment extends to a category page's
+topics is undecided until that page exists.
 
 **4. Moderation UI.** A `/review` page with publish/archive buttons, or approve
 with curl for now?
