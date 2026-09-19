@@ -75,6 +75,36 @@ Adding a router before a second page exists to route to is exactly the kind
 of premature abstraction this repo's conventions warn against; it goes in
 when `/c/:slug` (or another route from §6) is actually built.
 
+### Category nav: spinner + tree, not the horizontal arc
+
+Superseded the first pass at `ArcNav` (a horizontal dome of category names)
+with two separate surfaces, after seeing a mockup of a vertical rotary
+picker:
+
+**`CategorySpinner`** (bottom-right, home page only). Infinite wraparound —
+scrolling past the last category lands back on the first — which a real
+DOM scroll position can't do without cloning content or faking the scroll
+height. Instead it's driven by a virtual offset: a `wheel` listener
+(`preventDefault`, so the page itself never scrolls) and `ArrowUp`/`ArrowDown`
+both nudge a continuous value that's taken `mod categories.length`. The page
+trades its native scroll for this on `/`, which is a deliberate tradeoff, not
+an oversight — the spinner *is* the page's primary interaction here.
+
+**`CategoryTreeNav`** (header, all pages once it's wired up elsewhere).
+A separate, ordinary expandable tree backed by the new `topics` table (see
+`docs/ARCHITECTURE.md` §2) — `Programming > Data Structures > Stack`, as deep
+as the data goes. Not the same job as the spinner: this is direct lookup for
+someone who already knows what they want, the spinner is for browsing.
+
+**Category restructuring (e.g. introducing "Math" as a parent of "Physics")
+is explicitly not decided.** The four existing categories and their subway
+colors are unchanged. `topics` nest *within* a category; they don't let a
+category nest inside another one.
+
+**The expand button on the top-3 preview is stubbed.** `/c/:slug` isn't
+built, so it renders disabled rather than as a dead link. No router yet,
+per above.
+
 ---
 
 ## 2. Visualization libraries
