@@ -103,6 +103,16 @@ rotating past a full lap is already seamless — unlike the earlier
 slot-based approach this replaced, which needed a fractional-offset trick to
 fake the same continuity.
 
+The radius scales with `window.innerWidth` (down to `MIN_RADIUS_SCALE` at
+narrow desktop widths, in `CategorySpinner.tsx`) rather than staying fixed —
+a fixed-size circle tuned for a wide window reaches far enough left on a
+narrower one to overlap the centered preview grid. Below `sm` it's the
+tap-row fallback regardless, so this only covers the desktop range.
+
+The dot marker is colored to match whichever category is currently active
+(the same rounded index `onActiveChange` uses), not a fixed color — it's
+what ties the dot to "these are that category's visuals" in the grid below.
+
 **`CategoryTreeNav`** (header). A Khan Academy–style two-column menu: a
 fixed left list of categories, and a right pane — its own header plus a
 `max-h` + `overflow-y-auto` scrollable topic list — that swaps to whichever

@@ -101,9 +101,10 @@ Do not weaken these without an explicit decision recorded in `docs/DECISIONS.md`
   and `#FCCC0A`.
 - **Light and dark both first-class.** Light is paper cream, dark is charcoal —
   not pure black.
-- **Navigation** is two surfaces: an infinitely-wrapping category spinner with a
-  blue dot marker (home page, wheel/arrow-key driven — see `docs/DECISIONS.md`),
-  and a separate tree dropdown in the header backed by `topics`.
+- **Navigation** is two surfaces: an infinitely-wrapping category spinner (home
+  page, wheel/arrow-key driven — see `docs/DECISIONS.md`) with a dot marker
+  colored to match whichever category is active, and a separate tree dropdown
+  in the header backed by `topics`.
 - **"Full screen"** means an expanded-layout toggle, never the browser Fullscreen
   API — it behaves inconsistently and traps keyboard handling.
 

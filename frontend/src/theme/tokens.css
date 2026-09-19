@@ -22,9 +22,6 @@
   --color-ink: #1c1a15;
   --color-ink-muted: #6b6455;
   --color-line: #ddd5c0;
-  /* The nav's "blue dot" marker — reuses the Signals & Systems subway blue
-     rather than inventing a second, undocumented blue. */
-  --color-marker: #0039a6;
 }
 
 :root[data-theme='dark'] {
@@ -33,7 +30,6 @@
   --color-ink: #f1ede2;
   --color-ink-muted: #a8a196;
   --color-line: #3a3a38;
-  --color-marker: #6e94d6;
 }
 
 body {
