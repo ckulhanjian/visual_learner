@@ -18,7 +18,8 @@ python run.py seed
 python run.py            # http://localhost:5001/api/v1/health
 ```
 
-The frontend is not built yet.
+A plain HTML/JS page (`frontend-test/index.html`) exercises the API for manual
+testing. The real React frontend is not built yet.
 
 ## Documentation
 

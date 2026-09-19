@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Atlas API test page</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.25rem; }
+  section { border: 1px solid #8888; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; }
+  h2 { margin-top: 0; font-size: 1rem; }
+  label { display: block; margin: 0.5rem 0 0.2rem; font-size: 0.85rem; }
+  input, textarea, select { width: 100%; box-sizing: border-box; font-family: inherit; padding: 0.3rem; }
+  textarea { min-height: 4rem; }
+  button { margin-top: 0.75rem; padding: 0.4rem 0.9rem; cursor: pointer; }
+  pre { background: #8881; padding: 0.75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+  .row { display: flex; gap: 1rem; }
+  .row > div { flex: 1; }
+  .status-ok { color: #0a0; }
+  .status-err { color: #c00; }
+</style>
+</head>
+<body>
+<h1>Atlas API test page</h1>
+<p>Talks directly to the Flask backend. Not the real frontend — just a wire-format check.</p>
+
+<section>
+  <h2>Connection</h2>
+  <div class="row">
+    <div>
+      <label>API base</label>
+      <input id="api-base" value="http://localhost:5001/api/v1">
+    </div>
+    <div>
+      <label>X-Atlas-Key (optional)</label>
+      <input id="write-key" placeholder="leave blank for anonymous">
+    </div>
+  </div>
+  <button onclick="checkHealth()">Check /health</button>
+  <pre id="health-out"></pre>
+</section>
+
+<section>
+  <h2>Meta</h2>
+  <button onclick="loadMeta()">GET /meta</button>
+  <pre id="meta-out"></pre>
+</section>
+
+<section>
+  <h2>Categories</h2>
+  <button onclick="loadCategories()">GET /categories</button>
+  <pre id="categories-out"></pre>
+</section>
+
+<section>
+  <h2>Tags</h2>
+  <button onclick="loadTags()">GET /tags</button>
+  <pre id="tags-out"></pre>
+</section>
+
+<section>
+  <h2>Visuals</h2>
+  <div class="row">
+    <div>
+      <label>category (slug, optional)</label>
+      <input id="visuals-category">
+    </div>
+    <div>
+      <label>tag (slug, optional)</label>
+      <input id="visuals-tag">
+    </div>
+  </div>
+  <button onclick="loadVisuals()">GET /visuals</button>
+  <pre id="visuals-out"></pre>
+
+  <label>slug to fetch in full</label>
+  <input id="visual-slug" placeholder="fourier-series-square-wave">
+  <button onclick="loadVisual()">GET /visuals/&lt;slug&gt;</button>
+  <pre id="visual-detail-out"></pre>
+</section>
+
+<section>
+  <h2>Submit a visual</h2>
+  <div class="row">
+    <div>
+      <label>title</label>
+      <input id="v-title" value="Test Visual">
+      <label>kind</label>
+      <select id="v-kind">
+        <option value="svg">svg</option>
+        <option value="image">image</option>
+        <option value="chartjs">chartjs</option>
+        <option value="d3">d3</option>
+        <option value="html">html</option>
+        <option value="p5">p5</option>
+      </select>
+      <label>category_slug</label>
+      <input id="v-category" value="physics">
+      <label>tags (comma-separated)</label>
+      <input id="v-tags" value="test">
+    </div>
+    <div>
+      <label>source (ignored for kind=image)</label>
+      <textarea id="v-source"><svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"/></svg></textarea>
+      <label>asset_path (for kind=image — fill via upload below)</label>
+      <input id="v-asset-path">
+      <label>summary_md</label>
+      <input id="v-summary" value="Submitted from the test page.">
+    </div>
+  </div>
+  <button onclick="submitVisual()">POST /visuals</button>
+  <pre id="submit-out"></pre>
+</section>
+
+<section>
+  <h2>Upload an image</h2>
+  <input type="file" id="upload-file" accept=".png,.jpg,.jpeg,.gif,.svg,.webp">
+  <button onclick="uploadFile()">POST /uploads</button>
+  <pre id="upload-out"></pre>
+  <img id="upload-preview" style="max-width: 200px; display: none;">
+</section>
+
+<section>
+  <h2>Moderation (requires key)</h2>
+  <div class="row">
+    <div>
+      <label>slug</label>
+      <input id="mod-slug" placeholder="e.g. a pending slug from Visuals above">
+    </div>
+    <div>
+      <label>new status</label>
+      <select id="mod-status">
+        <option value="published">published</option>
+        <option value="pending">pending</option>
+        <option value="archived">archived</option>
+      </select>
+    </div>
+  </div>
+  <button onclick="setStatus()">POST /visuals/&lt;slug&gt;/status</button>
+  <button onclick="deleteVisual()">DELETE /visuals/&lt;slug&gt;</button>
+  <pre id="mod-out"></pre>
+</section>
+
+<script>
+function apiBase() { return document.getElementById('api-base').value.replace(/\/$/, ''); }
+function writeKey() { return document.getElementById('write-key').value.trim(); }
+
+function authHeaders(extra) {
+  const headers = Object.assign({}, extra);
+  const key = writeKey();
+  if (key) headers['X-Atlas-Key'] = key;
+  return headers;
+}
+
+async function callApi(path, options, outEl) {
+  const el = typeof outEl === 'string' ? document.getElementById(outEl) : outEl;
+  try {
+    const resp = await fetch(apiBase() + path, options);
+    let body;
+    const text = await resp.text();
+    try { body = JSON.parse(text); } catch { body = text; }
+    el.className = resp.ok ? 'status-ok' : 'status-err';
+    el.textContent = `${resp.status} ${resp.statusText}\n` + JSON.stringify(body, null, 2);
+    return { ok: resp.ok, status: resp.status, body };
+  } catch (err) {
+    el.className = 'status-err';
+    el.textContent = 'Request failed: ' + err.message + '\n(Is the backend running, and is CORS_ORIGINS set to this page\'s origin?)';
+    return { ok: false, error: err };
+  }
+}
+
+function checkHealth() {
+  return callApi('/health', { headers: authHeaders() }, 'health-out');
+}
+
+function loadMeta() {
+  return callApi('/meta', { headers: authHeaders() }, 'meta-out');
+}
+
+function loadCategories() {
+  return callApi('/categories', { headers: authHeaders() }, 'categories-out');
+}
+
+function loadTags() {
+  return callApi('/tags', { headers: authHeaders() }, 'tags-out');
+}
+
+function loadVisuals() {
+  const params = new URLSearchParams();
+  const category = document.getElementById('visuals-category').value.trim();
+  const tag = document.getElementById('visuals-tag').value.trim();
+  if (category) params.set('category', category);
+  if (tag) params.set('tag', tag);
+  const qs = params.toString();
+  return callApi('/visuals' + (qs ? '?' + qs : ''), { headers: authHeaders() }, 'visuals-out');
+}
+
+function loadVisual() {
+  const slug = document.getElementById('visual-slug').value.trim();
+  if (!slug) return;
+  return callApi('/visuals/' + encodeURIComponent(slug), { headers: authHeaders() }, 'visual-detail-out');
+}
+
+async function submitVisual() {
+  const kind = document.getElementById('v-kind').value;
+  const payload = {
+    title: document.getElementById('v-title').value,
+    kind,
+    category_slug: document.getElementById('v-category').value,
+    summary_md: document.getElementById('v-summary').value,
+    tags: document.getElementById('v-tags').value.split(',').map(s => s.trim()).filter(Boolean),
+  };
+  if (kind === 'image') {
+    payload.asset_path = document.getElementById('v-asset-path').value;
+  } else {
+    payload.source = document.getElementById('v-source').value;
+  }
+  await callApi('/visuals', {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  }, 'submit-out');
+}
+
+async function uploadFile() {
+  const input = document.getElementById('upload-file');
+  const preview = document.getElementById('upload-preview');
+  if (!input.files.length) {
+    document.getElementById('upload-out').textContent = 'Choose a file first.';
+    return;
+  }
+  const formData = new FormData();
+  formData.append('file', input.files[0]);
+  const result = await callApi('/uploads', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData,
+  }, 'upload-out');
+  if (result.ok && result.body && result.body.asset_path) {
+    document.getElementById('v-asset-path').value = result.body.asset_path;
+    preview.src = apiBase().replace(/\/api\/v1$/, '') + result.body.asset_path;
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+function setStatus() {
+  const slug = document.getElementById('mod-slug').value.trim();
+  const status = document.getElementById('mod-status').value;
+  if (!slug) return;
+  return callApi('/visuals/' + encodeURIComponent(slug) + '/status', {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ status }),
+  }, 'mod-out');
+}
+
+function deleteVisual() {
+  const slug = document.getElementById('mod-slug').value.trim();
+  if (!slug) return;
+  return callApi('/visuals/' + encodeURIComponent(slug), {
+    method: 'DELETE',
+    headers: authHeaders(),
+  }, 'mod-out');
+}
+</script>
+</body>
+</html>
