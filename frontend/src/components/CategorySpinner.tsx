@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Category } from '../domain/Category'
 
 interface CategorySpinnerProps {
@@ -7,14 +7,23 @@ interface CategorySpinnerProps {
   onActiveChange: (category: Category) => void
 }
 
-const ITEM_HEIGHT = 28 // px between rows
-const VISIBLE_HALF = 6 // rows rendered above/below center (13 total)
-const MAX_TILT_DEGREES = 68
-const WHEEL_SENSITIVITY = 0.0032 // wheel deltaY px -> fraction of a row
+const RADIUS = 190 // px from the (off-screen right) center to the selected label
+// Degrees of arc between adjacent categories. Fixed, not 360/count: with as
+// few as 4 categories, dividing the full circle evenly would put immediate
+// neighbors 90° from the selected item — fully vertical, unreadable text.
+// "No duplicates" means never render a category twice, not that the handful
+// that exist must be spread across the whole circle.
+const ANGLE_STEP_DEGREES = 22
+const CONTAINER_WIDTH = 420
+const CONTAINER_HEIGHT = 420
+const WHEEL_SENSITIVITY = 0.0032 // wheel deltaY px -> fraction of a step
 const DESKTOP_QUERY = '(min-width: 640px)' // Tailwind's sm
+const DEG_TO_RAD = Math.PI / 180
 
-function wrap(value: number, modulus: number): number {
-  return ((value % modulus) + modulus) % modulus
+// Shortest signed distance from `value` to the nearest multiple of `modulus`,
+// e.g. wrapToHalfRange(3.2, 4) -> -0.8 (3.2 is 0.8 short of the next lap of 4).
+function wrapToHalfRange(value: number, modulus: number): number {
+  return value - modulus * Math.round(value / modulus)
 }
 
 function useIsDesktopWidth(): boolean {
@@ -30,15 +39,16 @@ function useIsDesktopWidth(): boolean {
   return isDesktop
 }
 
-// Bottom-right, infinitely-wrapping, driven by wheel + arrow keys rather than
-// real page scroll — see docs/DECISIONS.md for why. A fixed set of DOM slots
-// each show a modulo-computed category label; only a fractional pixel offset
-// (shared by every slot) animates continuously, so the handoff between slots
-// at each integer crossing reads as one continuous line, not a snap.
+// A true circle whose center sits off-screen at the container's right edge:
+// the selected category always sits at the leftmost point of that circle
+// (radius pointing due left), and each neighboring category sits a fixed
+// angular step further around it — categories before it swing up-and-right,
+// categories after it swing down-and-right. With exactly one point per
+// category and no repeats, wraparound needs no special-casing: angles are
+// periodic, so rotating past a full lap is already seamless.
 //
-// Below sm, the fixed-size spinner has nowhere to go without overlapping the
-// preview panel on a narrow viewport, and "scroll to browse" doesn't fit a
-// touch device anyway — a plain tap-to-select row takes over instead.
+// Below sm, this has nowhere to go without overlapping the preview content
+// on a narrow viewport — a plain tap-to-select row takes over instead.
 export function CategorySpinner({ categories, activeSlug, onActiveChange }: CategorySpinnerProps) {
   const count = categories.length
   const isDesktopWidth = useIsDesktopWidth()
@@ -58,7 +68,7 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
   const commitIfChanged = useCallback(
     (rawPosition: number) => {
       if (count === 0) return
-      const index = wrap(Math.round(rawPosition), count)
+      const index = ((Math.round(rawPosition) % count) + count) % count
       if (index !== activeIndexRef.current) {
         activeIndexRef.current = index
         onActiveChange(categories[index])
@@ -100,18 +110,9 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
     }
   }, [count, isDesktopWidth, movePosition])
 
-  const slots = useMemo(
-    () => Array.from({ length: VISIBLE_HALF * 2 + 1 }, (_, i) => i - VISIBLE_HALF),
-    [],
-  )
-
   if (count === 0) {
     return null
   }
-
-  const roundedPosition = Math.round(position)
-  const fraction = position - roundedPosition // in [-0.5, 0.5)
-  const pixelOffset = -fraction * ITEM_HEIGHT
 
   return (
     <>
@@ -140,39 +141,48 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
         aria-label="Categories"
         role="listbox"
         tabIndex={0}
-        className="fixed right-6 bottom-6 hidden h-[364px] w-[280px] overflow-hidden focus:outline-none sm:block"
-        style={{ maskImage: 'linear-gradient(to bottom, transparent, black 18%, black 82%, transparent)' }}
+        className="fixed right-6 bottom-6 hidden overflow-hidden focus:outline-none sm:block"
+        style={{
+          height: CONTAINER_HEIGHT,
+          width: CONTAINER_WIDTH,
+          maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
+        }}
       >
-        <div className="relative h-full">
-          <div
-            aria-hidden="true"
-            className="bg-marker absolute top-1/2 right-2 h-2 w-2 -translate-y-1/2 rounded-full"
-          />
-          {slots.map((slot) => {
-            const categoryIndex = wrap(roundedPosition + slot, count)
-            const category = categories[categoryIndex]
-            const rotation = Math.max(
-              -MAX_TILT_DEGREES,
-              Math.min(MAX_TILT_DEGREES, slot * (MAX_TILT_DEGREES / VISIBLE_HALF)),
-            )
-            const isActive = slot === 0
-            return (
-              <div
-                key={slot}
-                role="option"
-                aria-selected={isActive}
-                className="absolute top-1/2 right-6 origin-right whitespace-nowrap font-mono text-sm"
-                style={{
-                  transform: `translateY(calc(-50% + ${slot * ITEM_HEIGHT + pixelOffset}px)) rotate(${rotation}deg)`,
-                  color: category.color,
-                  opacity: isActive ? 1 : Math.max(0.2, 1 - Math.abs(slot) / (VISIBLE_HALF + 1)),
-                }}
-              >
-                {category.name}
-              </div>
-            )
-          })}
-        </div>
+        {/* Sits just past the selected label's right edge, not on top of it —
+            both anchor from the same point, so without an offset the dot
+            would overlap the label's last character. */}
+        <div
+          aria-hidden="true"
+          className="bg-marker absolute h-2 w-2 -translate-y-1/2 rounded-full"
+          style={{ right: RADIUS - 14, top: '50%' }}
+        />
+        {categories.map((category, index) => {
+          const diff = wrapToHalfRange(index - position, count)
+          const angleDeg = 180 - diff * ANGLE_STEP_DEGREES
+          const angleRad = angleDeg * DEG_TO_RAD
+          const x = RADIUS * Math.cos(angleRad)
+          const y = RADIUS * Math.sin(angleRad)
+          const rotation = -diff * ANGLE_STEP_DEGREES
+          const isActive = Math.abs(diff) < 0.5 / count
+          const opacity = Math.max(0.2, 1 - Math.abs(diff) / (count / 2))
+          return (
+            <div
+              key={category.slug}
+              role="option"
+              aria-selected={isActive}
+              className="absolute origin-right whitespace-nowrap font-mono text-sm"
+              style={{
+                right: -x,
+                top: `calc(50% + ${y}px)`,
+                transform: `translateY(-50%) rotate(${rotation}deg)`,
+                color: category.color,
+                opacity,
+              }}
+            >
+              {category.name}
+            </div>
+          )
+        })}
       </div>
     </>
   )

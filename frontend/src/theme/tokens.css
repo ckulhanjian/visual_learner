@@ -28,11 +28,11 @@
 }
 
 :root[data-theme='dark'] {
-  --color-paper: #0b0b0c;
-  --color-surface: #131311;
+  --color-paper: #1c1c1c;
+  --color-surface: #262626;
   --color-ink: #f1ede2;
-  --color-ink-muted: #9a9384;
-  --color-line: #2c2a26;
+  --color-ink-muted: #a8a196;
+  --color-line: #3a3a38;
   --color-marker: #6e94d6;
 }
 
