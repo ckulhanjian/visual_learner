@@ -28,7 +28,7 @@ def create_app(env_name=None):
     db.init_app(app)
 
     with app.app_context():
-        from app.models import associations, category, resource, tag, visual  # noqa: F401
+        from app.models import associations, category, resource, tag, topic, visual  # noqa: F401
 
     register_blueprints(app)
     register_error_handlers(app)
@@ -47,6 +47,7 @@ def register_blueprints(app):
     from app.api.health import bp as health_bp
     from app.api.meta import bp as meta_bp
     from app.api.tags import bp as tags_bp
+    from app.api.topics import bp as topics_bp
     from app.api.uploads import bp as uploads_bp
     from app.api.visuals import bp as visuals_bp
 
@@ -55,5 +56,6 @@ def register_blueprints(app):
     app.register_blueprint(meta_bp, url_prefix=prefix)
     app.register_blueprint(categories_bp, url_prefix=prefix)
     app.register_blueprint(tags_bp, url_prefix=prefix)
+    app.register_blueprint(topics_bp, url_prefix=prefix)
     app.register_blueprint(visuals_bp, url_prefix=prefix)
     app.register_blueprint(uploads_bp, url_prefix=prefix)

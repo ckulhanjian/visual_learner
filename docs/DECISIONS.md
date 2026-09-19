@@ -55,6 +55,56 @@ Flask on **5001**, not 5000 — macOS binds 5000 to the AirPlay Receiver and the
 failure mode is a silent 403 from a service you did not know was running. Vite on
 5173, proxying `/api` to Flask.
 
+### Theme default
+
+**Paper cream first.** The site loads light unless the visitor has toggled to
+dark before (persisted in `localStorage`, read before first paint to avoid a
+flash of the wrong theme — see `frontend/index.html`). Both stay first-class;
+this only decides the unauthenticated starting point.
+
+### Frontend fonts
+
+Self-hosted via `@fontsource`, latin-only subsets — pulling the default
+`400.css` etc. drags in cyrillic/greek/vietnamese subsets nothing here needs
+and roughly quadruples the CSS payload for no visible difference.
+
+### No router yet
+
+`react-router-dom` isn't installed. `src/App.tsx` renders `Home` directly.
+Adding a router before a second page exists to route to is exactly the kind
+of premature abstraction this repo's conventions warn against; it goes in
+when `/c/:slug` (or another route from §6) is actually built.
+
+### Category nav: spinner + tree, not the horizontal arc
+
+Superseded the first pass at `ArcNav` (a horizontal dome of category names)
+with two separate surfaces, after seeing a mockup of a vertical rotary
+picker:
+
+**`CategorySpinner`** (bottom-right, home page only). Infinite wraparound —
+scrolling past the last category lands back on the first — which a real
+DOM scroll position can't do without cloning content or faking the scroll
+height. Instead it's driven by a virtual offset: a `wheel` listener
+(`preventDefault`, so the page itself never scrolls) and `ArrowUp`/`ArrowDown`
+both nudge a continuous value that's taken `mod categories.length`. The page
+trades its native scroll for this on `/`, which is a deliberate tradeoff, not
+an oversight — the spinner *is* the page's primary interaction here.
+
+**`CategoryTreeNav`** (header, all pages once it's wired up elsewhere).
+A separate, ordinary expandable tree backed by the new `topics` table (see
+`docs/ARCHITECTURE.md` §2) — `Programming > Data Structures > Stack`, as deep
+as the data goes. Not the same job as the spinner: this is direct lookup for
+someone who already knows what they want, the spinner is for browsing.
+
+**Category restructuring (e.g. introducing "Math" as a parent of "Physics")
+is explicitly not decided.** The four existing categories and their subway
+colors are unchanged. `topics` nest *within* a category; they don't let a
+category nest inside another one.
+
+**The expand button on the top-3 preview is stubbed.** `/c/:slug` isn't
+built, so it renders disabled rather than as a dead link. No router yet,
+per above.
+
 ---
 
 ## 2. Visualization libraries
@@ -198,9 +248,10 @@ thumbnails on upload means adding an image pipeline. Placeholder tiles, or worth
 the dependency?
 
 **2. Arc navigation scope.** Categories on the home page *and* topic titles on the
-category page, or just the home page with a plain grid underneath?
-
-**3. Dark mode default.** Paper cream first, or near-black first?
+category page, or just the home page with a plain grid underneath? Still open —
+the home page's `ArcNav` (`frontend/src/components/ArcNav.tsx`) only renders
+categories today; whether the same treatment extends to a category page's
+topics is undecided until that page exists.
 
 **4. Moderation UI.** A `/review` page with publish/archive buttons, or approve
 with curl for now?

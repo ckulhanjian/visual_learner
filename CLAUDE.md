@@ -18,7 +18,7 @@ submit is visible until it is reviewed.
 | | |
 |---|---|
 | Backend | Flask + SQLAlchemy + Marshmallow, SQLite. |
-| Frontend | Plain HTML/JS test page only, to exercise the API. React + TypeScript + Vite + Tailwind v4 not started. |
+| Frontend | React + TypeScript + Vite + Tailwind v4. Home page only (arc nav, theme, layout) — the other four routes aren't built. Plain HTML/JS test page (`frontend-test/`) still around for raw API poking. |
 | Deferred | Vega-Lite and the `/create` editor page, p5.js, Postgres, Alembic. |
 
 ## Commands
@@ -100,7 +100,9 @@ Do not weaken these without an explicit decision recorded in `docs/DECISIONS.md`
   Systems `#0039A6`, Programming `#00933C`, Circuits `#FF6319`. Reserve `#B933AD`
   and `#FCCC0A`.
 - **Light and dark both first-class.** Light is paper cream, dark is near-black.
-- **Navigation** is modeled on a rotating arc of names with a blue dot marker.
+- **Navigation** is two surfaces: an infinitely-wrapping category spinner with a
+  blue dot marker (home page, wheel/arrow-key driven — see `docs/DECISIONS.md`),
+  and a separate tree dropdown in the header backed by `topics`.
 - **"Full screen"** means an expanded-layout toggle, never the browser Fullscreen
   API — it behaves inconsistently and traps keyboard handling.
 

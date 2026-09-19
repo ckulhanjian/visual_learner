@@ -24,3 +24,4 @@ class Category(db.Model):
     )
 
     visuals: Mapped[List["Visual"]] = relationship(back_populates="category")
+    topics: Mapped[List["Topic"]] = relationship(back_populates="category")

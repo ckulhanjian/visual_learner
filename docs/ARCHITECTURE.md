@@ -125,6 +125,27 @@ Pure join table. `visual_id` + `tag_id`, both primary key, both
 | `kind` | enum | drives the icon |
 | `visual_id` | fk | indexed, cascade delete |
 
+### `topics`
+
+A category's subject tree — `Programming > Data Structures > Stack` — for the
+nav bar's tree dropdown. Not the same thing as a tag: a tag is cross-cutting
+and attaches to visuals directly; a topic is purely a navigational grouping
+within one category and (so far) attaches to nothing.
+
+| field | type | notes |
+|---|---|---|
+| `id` | int | primary key |
+| `slug` | str(140) | unique **per category**, not globally — see `resources` for the pattern this breaks from |
+| `name` | str(80) | as first typed |
+| `position` | int | manual ordering among siblings |
+| `category_id` | fk | indexed → categories. every topic has one, even nested ones |
+| `parent_id` | fk → topics, nullable | indexed, `ON DELETE CASCADE`. null = top-level |
+
+No timestamps, same reasoning as `tags`. `GET /api/v1/topics` returns every
+category paired with its top-level topics, each with a `children` array
+recursively — one request gives the whole tree. Currently only `Programming`
+has any; the rest are legitimately empty until content is added.
+
 ---
 
 ## 3. Controlled vocabularies
@@ -181,6 +202,7 @@ Base: `/api/v1`. Auth is the `X-Atlas-Key` header.
 | POST | `/categories` | key | 201 |
 | DELETE | `/categories/<slug>` | key | 204, or 409 if non-empty |
 | GET | `/tags` | open | tags + usage counts |
+| GET | `/topics` | open | every category + its topic tree |
 | GET | `/meta` | open | the vocabularies |
 | GET | `/health` | open | liveness |
 | GET | `/visuals` | open | card-shaped list |
@@ -222,12 +244,28 @@ instead of forcing one into multipart encoding it does not need.
 
 | route | shows | data |
 |---|---|---|
-| `/` | arc navigation of categories, subway-colored | `GET /categories` |
-| `/c/:slug` | 3-column grid of visual cards | `GET /categories/:slug` |
+| `/` | category spinner + top-3 preview of the active category, subway-colored | `GET /categories`, `GET /visuals?category=...` |
+| `/c/:slug` | *not built yet* — 3-column grid of visual cards | `GET /categories/:slug` |
 | `/v/:slug` | full-bleed visual, expand toggle, metadata and notes below | `GET /visuals/:slug` |
 | `/submit` | ConceptForm + upload or paste | `GET /categories`, `GET /tags`, `GET /meta`, `POST /visuals` |
 | `/create` | *deferred with Vega* — editor, live preview, same ConceptForm | as submit |
 | `/review` | *proposed* — pending queue with publish/archive | `GET /visuals?status=pending` |
+
+### `/`
+
+Two nav surfaces, not one:
+
+- **`CategorySpinner`** — a vertical, infinitely-wrapping list bottom-right.
+  Driven by wheel delta and arrow keys (not real page scroll — the page
+  itself doesn't move), with a blue dot marking whichever category is
+  centered. See `docs/DECISIONS.md` for why it isn't real scroll.
+- **`CategoryTreeNav`** — the header's expandable tree dropdown, backed by
+  `GET /topics`. Category → topic → sub-topic, as deep as the data goes.
+
+Whichever category is centered in the spinner drives a left-side panel (below
+the title/blurb) showing that category's most recent three published
+visuals, each with a stubbed "+" — `/c/:slug` doesn't exist yet, so it's
+disabled rather than a dead link.
 
 ### `/v/:slug`
 
@@ -255,9 +293,9 @@ schema. Adding a field later means editing one file and it appears in both place
 ```
 src/
   api/          one module per endpoint group; only place fetch appears
-  domain/       Visual, Category, Tag — types and logic on them
+  domain/       Visual, Category, Tag, Topic — types and logic on them
   renderers/    one file per kind; the registry mapping kind → renderer
-  components/   ConceptForm, ArcNav, VisualCard, MarkdownBody
+  components/   ConceptForm, CategorySpinner, CategoryTreeNav, VisualPreviewCard, MarkdownBody
   pages/        one file per route, mostly composing the above
   theme/        tokens, subway palette, dark mode
 ```
