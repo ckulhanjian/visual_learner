@@ -149,10 +149,29 @@ same drift that stayed inside a 4-category threshold fell outside a
 `onActiveChange` already committed to is immune to the drift by
 construction.
 
-**Font size and category count.** Labels moved from `text-sm` to `text-lg`,
-and `ANGLE_STEP_DEGREES` down slightly (22° → 20°) to keep 9 categories'
-worth of bigger text from crowding — see below for where the other 5
-categories came from.
+**Font size and category count.** Labels moved from `text-sm` to `text-lg`
+and then to `text-2xl` (second pass, after feedback that the labels still
+read too small at the bigger container), and `ANGLE_STEP_DEGREES` down
+slightly (22° → 20°) to keep 9 categories' worth of bigger text from
+crowding — see below for where the other 5 categories came from. `LABEL_GAP`
+(a fixed px push past `RADIUS` applied to every label's `right` offset, on
+top of the dot's own separate inset) exists for the same reason as the dot's
+color: without visible daylight between the active label and the dot, they
+read as one run-on element instead of two things pointing at each other.
+
+Bumping the font surfaced a second-order problem: `CategorySpinner`'s own
+geometry constants were tuned for the smaller font, and `getBoundingClientRect`
+on the more-rotated labels (the ones several steps from active, where
+rotation turns label *height* into real on-screen vertical — and, near
+horizontal, into real on-screen width) showed their true bounding boxes
+exceeding both `CONTAINER_WIDTH` and `CONTAINER_HEIGHT` — the container's own
+`overflow: hidden` was silently eating the far end of the word (e.g.
+"Circuits" rendering as "cuits"). That box's edges are a deliberate clip
+(the left edge in particular is what keeps the spinner off the grid), so the
+fix was giving labels more room inside it — `CONTAINER_WIDTH` 440 → 560,
+`CONTAINER_HEIGHT` 420 → 620 — not loosening the clip. The height has ample
+budget to spend: the column stretches to the page's full available height
+and centers within it, so growing it doesn't compete with anything.
 
 **`CategoryTreeNav`** (header). A Khan Academy–style two-column menu: a
 fixed left list of categories, and a right pane — its own header plus a
@@ -177,6 +196,14 @@ generated-to-taste one. None of the five have seed visuals yet — the empty
 grid state (the dashed "Empty" placeholders) was already built to handle
 that gracefully.
 
+`run_seed` looks categories up by slug and only creates the ones missing
+(`_get_or_create_category`), so it's safe — and necessary — to run again on
+a database seeded before these five existed; it adds the new rows without
+touching or duplicating anything already there. A `python run.py reset` (or
+a from-scratch `python run.py seed`) picks them up automatically; a
+dev database seeded before this change needs one `python run.py seed` run
+to catch up, and won't get there on its own.
+
 **The top-3 preview is a 4-column grid** (2 columns below `sm`, `max-w-3xl`
 rather than `max-w-xl` so tiles read as genuinely bigger on a wide screen),
 not a vertical list — visual cards fill the first slots, an `ExpandCell` is
@@ -192,7 +219,16 @@ to go yet. No router either, per above.
 `VisualPreviewCard` scales up on hover (with a shadow and a higher
 `z-index` so it doesn't get covered by its grid neighbors) — the point is to
 make a genuinely tiny thumbnail (an SVG shrunk into a 1:1 box) briefly
-legible without needing a real lightbox or a second page.
+legible without needing a real lightbox or a second page. The title beneath
+it does the same job for text: instead of `truncate`'s ellipsis, the full
+title is always in the DOM and slides left on hover far enough to bring its
+clipped tail fully into view (`translateX(-overflowPx)`, `overflowPx =
+scrollWidth - clientWidth`, computed via `useLayoutEffect` since it depends
+on rendered width, not string length), then eases back to the start on
+mouse-leave. A title that already fits computes `overflowPx = 0` and simply
+never moves. Transition duration scales with distance
+(`overflowPx / 30` seconds, floored at 0.5s) so a long title and a short one
+read as the same scroll *speed* rather than the same duration.
 
 **`FibonacciSpiral`** (`components/FibonacciSpiral.tsx`) draws behind the
 spinner's labels, tinted to the active category's color. It fills in
@@ -201,12 +237,24 @@ wraps back to the first category — both for free, by reusing the spinner's
 own continuous, wrapping `position` rather than tracking separate state:
 `progress = (position mod count) / count` is 0 exactly when `position` is a
 multiple of `count` (the first category), so the "restart" isn't a special
-case, it's what that formula already does. The path itself is a standard
-Fibonacci-squares construction (fixed at 8 terms regardless of category
-count — more terms just makes for a bigger sprawling shape, not a more
-correct one) rendered as one continuous SVG `<path>` with `pathLength="1"`
-so `stroke-dashoffset` can reveal it proportionally without needing to
-compute the path's true geometric length.
+case, it's what that formula already does. The underlying curve is a
+standard Fibonacci-squares construction (fixed at 8 terms regardless of
+category count — more terms just makes for a bigger sprawling shape, not a
+more correct one).
+
+It's rendered as a grid of small squares along that curve, not a smooth
+stroke — feedback on the first version (a thin anti-aliased `<path>`) was
+that it should look like pixel/ascii art, i.e. a curve visibly built from
+blocky steps, not a vector line. Re-deriving each arc's true center
+analytically (needed to sample points along it) was more work than reusing
+the browser's own arc math: `computePixelPath()` draws the exact same `d`
+string into a detached, never-painted `<path>`, walks it with
+`getPointAtLength` at a density fine enough not to skip a cell, and records
+one grid cell each time the curve crosses into a new one — a
+Bresenham-style rasterization, computed once (`useState`'s lazy
+initializer) since the curve is static and the result never changes.
+`progress` then reveals a prefix of that cell list instead of a
+`stroke-dashoffset` fraction.
 
 ---
 

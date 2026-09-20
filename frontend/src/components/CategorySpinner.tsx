@@ -16,9 +16,22 @@ interface CategorySpinnerProps {
 // scale factor was a heuristic working around not having that real layout
 // constraint; the constraint is the actual fix.
 const RADIUS = 170
-const CONTAINER_WIDTH = 440
-const CONTAINER_HEIGHT = 420
+// Wide enough that the longest name ("Signals & Systems") at the bigger
+// label font doesn't get clipped by this column's own left edge when it's
+// the active (unrotated, full-width) label — that edge is a deliberate
+// clip boundary (it's what keeps the spinner off the grid), so the fix is
+// giving labels enough room inside it, not removing the clip.
+const CONTAINER_WIDTH = 560
+// Tall enough that the most-rotated labels' bounding boxes (bigger now that
+// the font is bigger — rotation turns label height into real vertical
+// extent) stay inside this box's own clip, rather than getting cut off top
+// or bottom. There's ample vertical room to spend: this column stretches to
+// the page's full available height and is vertically centered in it.
+const CONTAINER_HEIGHT = 620
 const SPIRAL_SIZE = 200
+// Extra push past RADIUS so labels clear the dot with visible daylight
+// between them, instead of the label's edge sitting right up against it.
+const LABEL_GAP = 34
 const WHEEL_SENSITIVITY = 0.0032 // wheel deltaY px -> fraction of a step
 const DESKTOP_QUERY = '(min-width: 1024px)' // Tailwind's lg — matches Home.tsx's column breakpoint
 const DEG_TO_RAD = Math.PI / 180
@@ -176,11 +189,12 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
             <FibonacciSpiral progress={lapProgress} color={activeColor} />
           </div>
 
-          {/* Sits just past the selected label's right edge, not on top of it —
-              both anchor from the same point, so without an offset the dot
-              would overlap the label's last character. Colored to match
-              whichever category is active, so it's clear which one the
-              preview grid below belongs to. */}
+          {/* Sits well clear of the selected label's right edge (LABEL_GAP is
+              the same distance that pushes labels away from the dot below) —
+              both anchor from the same radius, so without real separation
+              the dot would crowd the label's last character. Colored to
+              match whichever category is active, so it's clear which one
+              the preview grid below belongs to. */}
           <div
             aria-hidden="true"
             className="absolute h-2.5 w-2.5 -translate-y-1/2 rounded-full transition-colors duration-150"
@@ -205,9 +219,9 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
                 key={category.slug}
                 role="option"
                 aria-selected={isActive}
-                className="absolute top-1/2 origin-right whitespace-nowrap font-mono text-lg"
+                className="absolute top-1/2 origin-right whitespace-nowrap font-mono text-2xl"
                 style={{
-                  right: -x,
+                  right: -x + LABEL_GAP,
                   transform: `translateY(calc(-50% + ${y}px)) rotate(${rotation}deg)`,
                   color: displayColor(category.color, theme),
                   opacity,
