@@ -159,6 +159,14 @@ top of the dot's own separate inset) exists for the same reason as the dot's
 color: without visible daylight between the active label and the dot, they
 read as one run-on element instead of two things pointing at each other.
 
+**Labels are `font-body italic`, matching the hero title, not `font-mono`.**
+Feedback asked for this explicitly — CLAUDE.md's design language calls for
+mono on "titles and code" generally, but the hero itself is already set in
+italic EB Garamond (a documented earlier decision), and the spinner reads as
+part of that same headline moment, not as UI chrome or code. Applied to both
+the desktop spinner labels and the small-viewport tap-row fallback, so the
+two don't disagree with each other.
+
 Bumping the font surfaced a second-order problem: `CategorySpinner`'s own
 geometry constants were tuned for the smaller font, and `getBoundingClientRect`
 on the more-rotated labels (the ones several steps from active, where
@@ -231,6 +239,12 @@ within the page as a whole, which is what the workspace column actually is.
 Tiles get genuinely large on a wide screen as a direct consequence, which is
 the point, not a side effect to guard against.
 
+That grid also carries its own small `mt-6` and `pl-6`/`pl-10` (past `sm`)
+on top of the workspace's shared `gap-10` and the page's own padding —
+sitting flush against the hero's left edge and directly under its text
+read as cramped, so the grid gets a bit more breathing room on both axes
+without affecting the hero above it or the workspace's own bounds.
+
 **The top-3 preview is a 4-column grid** (2 columns below `sm`), not a
 vertical list — visual cards fill the first slots, an `ExpandCell` is always
 the last one. No separate category-name heading above the grid either: the
@@ -266,27 +280,35 @@ standard Fibonacci-squares construction (fixed at 8 terms regardless of
 category count — more terms just makes for a bigger sprawling shape, not a
 more correct one).
 
-It's rendered as a grid of small squares along that curve, not a smooth
-stroke — feedback on the first version (a thin anti-aliased `<path>`) was
-that it should look like pixel/ascii art, i.e. a curve visibly built from
-blocky steps, not a vector line. Re-deriving each arc's true center
-analytically (needed to sample points along it) was more work than reusing
-the browser's own arc math: `computePixelPath()` draws the exact same `d`
-string into a detached, never-painted `<path>`, walks it with
-`getPointAtLength` at a density fine enough not to skip a cell, and records
-one grid cell each time the curve crosses into a new one — a
-Bresenham-style rasterization, computed once (`useState`'s lazy
-initializer) since the curve is static and the result never changes.
-`progress` then reveals a prefix of that cell list instead of a
-`stroke-dashoffset` fraction.
+It briefly rendered as a grid of small squares along that curve instead of
+a smooth stroke — feedback on the first version (a thin anti-aliased
+`<path>`) asked for a pixel/ascii-art read, blocky steps rather than a
+vector line — but a later round asked for "a circle spiral, not pixel
+dots," reversing that. It's back to the original: one continuous `<path>`
+along the arcs, `pathLength="1"` with `stroke-dashoffset` revealing it
+proportionally, no rasterization step. The rasterizer
+(`computePixelPath`, a detached `<path>` walked with `getPointAtLength`
+and bucketed into grid cells) is gone with it rather than kept dead in the
+file — nothing else used it.
 
 The Fibonacci-squares construction itself grows wider than tall (each
 successive square approaches the golden ratio versus the accumulated
 rectangle, ~1.6:1) — it reads as horizontal by default. Feedback wanted it
 vertical, and rotating the whole rendered `<svg>` 90° (a CSS `transform`,
-not a change to the square/path/rasterization math) does that: the
-container it lives in is a square (`SPIRAL_SIZE` × `SPIRAL_SIZE`), so
-rotating in place doesn't shift or resize anything else.
+not a change to the square/path math) does that: the container it lives in
+is a square (`SPIRAL_SIZE` × `SPIRAL_SIZE`), so rotating in place doesn't
+shift or resize anything else.
+
+**Tucked into the one strip of the listbox no label or the dot ever
+reaches**, not centered behind them. Every rendered label's `right` offset
+(`LABEL_GAP` + `RADIUS * cos(angle)` across the visible diffs) falls in
+roughly `[63.5, 204]`, and the dot sits at `RADIUS - 16 = 154` — so
+`right: 0` to `~60` is dead space at every rotation, not just the one the
+first version was screenshotted at. Shrinking `SPIRAL_SIZE` (200 → 56) to
+fit inside that strip and moving it there (`right-10` → `right-1`) fixed a
+real overlap: the original size and position put it directly behind the
+dot and the active label, the one spot guaranteed to always have something
+else on top of it.
 
 ---
 

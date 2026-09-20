@@ -1,5 +1,3 @@
-import { useState } from 'react'
-
 interface Point {
   x: number
   y: number
@@ -101,107 +99,44 @@ const SPIRAL = buildSpiralPath(buildFibonacciSquares(TERMS))
 const PADDING = 1
 const VIEW_BOX = `${SPIRAL.minX - PADDING} ${SPIRAL.minY - PADDING} ${SPIRAL.width + PADDING * 2} ${SPIRAL.height + PADDING * 2}`
 
-// Cells across the spiral's wider axis — coarse enough to read as blocky,
-// pixel-art "steps" rather than a smooth curve (what "ascii art" meant here:
-// a curve rasterized onto a visible grid, not a font-character rendering).
-const GRID_COLUMNS = 34
-
-interface Cell {
-  col: number
-  row: number
-}
-
-let cachedPixelPath: Cell[] | null = null
-
-// Walks the true (smooth) spiral curve and buckets it into grid cells,
-// recording one entry each time the curve crosses into a new cell — a
-// Bresenham-style rasterization, but driven by the browser's own arc math
-// (via a detached, unrendered <path>) rather than re-deriving each arc's
-// center analytically.
-function computePixelPath(): Cell[] {
-  if (cachedPixelPath) return cachedPixelPath
-  if (typeof document === 'undefined') return []
-
-  const svgNs = 'http://www.w3.org/2000/svg'
-  const svg = document.createElementNS(svgNs, 'svg')
-  svg.setAttribute('aria-hidden', 'true')
-  svg.style.position = 'absolute'
-  svg.style.width = '0'
-  svg.style.height = '0'
-  svg.style.overflow = 'hidden'
-  const path = document.createElementNS(svgNs, 'path')
-  path.setAttribute('d', SPIRAL.d)
-  svg.appendChild(path)
-  document.body.appendChild(svg)
-
-  const cellSize = SPIRAL.width / GRID_COLUMNS
-  const totalLength = path.getTotalLength()
-  // Dense enough that the curve can't skip over a cell between samples.
-  const sampleCount = Math.max(1, Math.ceil(totalLength / (cellSize * 0.35)))
-  const cells: Cell[] = []
-  let lastCol = NaN
-  let lastRow = NaN
-  for (let i = 0; i <= sampleCount; i++) {
-    const point = path.getPointAtLength((i / sampleCount) * totalLength)
-    const col = Math.floor((point.x - SPIRAL.minX) / cellSize)
-    const row = Math.floor((point.y - SPIRAL.minY) / cellSize)
-    if (col !== lastCol || row !== lastRow) {
-      cells.push({ col, row })
-      lastCol = col
-      lastRow = row
-    }
-  }
-
-  document.body.removeChild(svg)
-  cachedPixelPath = cells
-  return cells
-}
-
 interface FibonacciSpiralProps {
   progress: number // 0 (undrawn) to 1 (fully drawn)
   color: string
 }
 
-// A decorative accompaniment to the spinner: fills in, cell by cell, as
+// A decorative accompaniment to the spinner: draws progressively as
 // `progress` advances through the categories, and — since progress is
 // derived from the same continuous, wrapping position the spinner already
 // tracks — resets to undrawn the instant you cycle back to the first
-// category. Rendered as a grid of squares rather than a smooth stroke, for
-// a pixel-art / ascii-art read. See docs/DECISIONS.md.
+// category. See docs/DECISIONS.md.
+//
+// Drawn as one continuous stroke along circular arcs (a "circle spiral"),
+// not rasterized into squares — an earlier pixel-art version traded that
+// smooth curve for a blocky read, which feedback reversed. `pathLength="1"`
+// lets `stroke-dashoffset` reveal it proportionally without computing the
+// path's true geometric length.
 export function FibonacciSpiral({ progress, color }: FibonacciSpiralProps) {
-  // Lazy initializer: runs once on mount rather than on every render, since
-  // it touches the DOM (a detached, throwaway <path> to reuse the browser's
-  // own arc math — see computePixelPath) and the result never changes.
-  const [cells] = useState(computePixelPath)
-  if (cells.length === 0) return null
-
-  const cellSize = SPIRAL.width / GRID_COLUMNS
-  const visibleCount = Math.round(progress * cells.length)
-
   return (
     <svg
       viewBox={VIEW_BOX}
       aria-hidden="true"
-      shapeRendering="crispEdges"
       // The underlying Fibonacci-squares construction grows wider than tall
       // (successive squares approach the golden ratio, ~1.6:1) — rotating
-      // the whole rendered grid 90° turns that long axis vertical without
-      // touching the geometry/rasterization math, which doesn't care about
-      // screen orientation.
+      // the whole rendered curve 90° turns that long axis vertical without
+      // touching the geometry, which doesn't care about screen orientation.
       style={{ transform: 'rotate(90deg)' }}
       className="pointer-events-none absolute inset-0 h-full w-full"
     >
-      {cells.slice(0, visibleCount).map((cell, index) => (
-        <rect
-          key={index}
-          x={SPIRAL.minX + cell.col * cellSize}
-          y={SPIRAL.minY + cell.row * cellSize}
-          width={cellSize}
-          height={cellSize}
-          fill={color}
-          opacity={0.55}
-        />
-      ))}
+      <path
+        d={SPIRAL.d}
+        fill="none"
+        stroke={color}
+        strokeWidth={0.55}
+        strokeLinecap="round"
+        opacity={0.4}
+        pathLength={1}
+        style={{ strokeDasharray: 1, strokeDashoffset: 1 - progress }}
+      />
     </svg>
   )
 }

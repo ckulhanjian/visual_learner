@@ -33,7 +33,11 @@ const CONTAINER_WIDTH = 560
 // sooner instead, which is the smaller cost.
 const CONTAINER_HEIGHT = 620
 const CONTAINER_HEIGHT_CSS = `min(${CONTAINER_HEIGHT}px, 65vh)`
-const SPIRAL_SIZE = 200
+// Every rendered label's `right` offset falls in [63.5, 204] (the range
+// LABEL_GAP + RADIUS*cos(angle) produces across the visible diffs) and the
+// dot sits at RADIUS-16=154 — so a square this size tucked flush against
+// the container's own right edge never overlaps either, at any rotation.
+const SPIRAL_SIZE = 56
 // Extra push past RADIUS so labels clear the dot with visible daylight
 // between them, instead of the label's edge sitting right up against it.
 const LABEL_GAP = 34
@@ -163,7 +167,7 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
                 activeIndexRef.current = categories.indexOf(category)
                 onActiveChange(category)
               }}
-              className="whitespace-nowrap rounded-full px-2 py-1 font-mono text-sm"
+              className="font-body whitespace-nowrap rounded-full px-2 py-1 text-sm italic"
               style={{
                 color: displayColor(category.color, theme),
                 textDecoration: category.slug === activeSlug ? 'underline' : 'none',
@@ -190,7 +194,7 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
             maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
           }}
         >
-          <div className="absolute top-1/2 right-10 -translate-y-1/2" style={{ width: SPIRAL_SIZE, height: SPIRAL_SIZE }}>
+          <div className="absolute top-1/2 right-1 -translate-y-1/2" style={{ width: SPIRAL_SIZE, height: SPIRAL_SIZE }}>
             <FibonacciSpiral progress={lapProgress} color={activeColor} />
           </div>
 
@@ -224,7 +228,7 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
                 key={category.slug}
                 role="option"
                 aria-selected={isActive}
-                className="absolute top-1/2 origin-right whitespace-nowrap font-mono text-2xl"
+                className="font-body absolute top-1/2 origin-right text-2xl whitespace-nowrap italic"
                 style={{
                   right: -x + LABEL_GAP,
                   transform: `translateY(calc(-50% + ${y}px)) rotate(${rotation}deg)`,
