@@ -173,7 +173,7 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
         aria-label="Categories"
         role="listbox"
         tabIndex={0}
-        className="fixed right-6 bottom-6 hidden overflow-hidden focus:outline-none sm:block"
+        className="fixed top-1/2 right-3 hidden -translate-y-1/2 overflow-hidden focus:outline-none sm:block"
         style={{
           height: CONTAINER_HEIGHT,
           width: containerWidth,

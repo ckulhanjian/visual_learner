@@ -256,7 +256,7 @@ instead of forcing one into multipart encoding it does not need.
 Two nav surfaces, not one:
 
 - **`CategorySpinner`** — categories arranged on a true circle whose center
-  sits off-screen at the container's right edge, bottom-right, infinitely
+  sits off-screen at the container's right edge, vertically centered, infinitely
   wrapping. Driven by wheel delta and arrow keys (not real page scroll — the
   page itself doesn't move), with a blue dot marking whichever category is
   centered. See `docs/DECISIONS.md` for the geometry and why it isn't real

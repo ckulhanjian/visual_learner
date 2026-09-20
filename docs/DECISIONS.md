@@ -81,7 +81,7 @@ Superseded the first pass at `ArcNav` (a horizontal dome of category names)
 with two separate surfaces, after seeing a mockup of a vertical rotary
 picker:
 
-**`CategorySpinner`** (bottom-right, home page only). Infinite wraparound —
+**`CategorySpinner`** (vertically centered on the right edge, home page only). Infinite wraparound —
 scrolling past the last category lands back on the first — which a real
 DOM scroll position can't do without cloning content or faking the scroll
 height. Instead it's driven by a virtual offset: a `wheel` listener
@@ -128,11 +128,19 @@ category nest inside another one.
 
 **The top-3 preview is a 4-column grid** (2 columns below `sm`), not a
 vertical list — visual cards fill the first slots, an `ExpandCell` is always
-the last one. No separate category-name heading above it either: the spinner
-and tree nav already say which category is active, so repeating it there was
-redundant. `ExpandCell` is disabled rather than a dead link — `/c/:slug`
-isn't built, so there's nowhere for it to go yet. No router either, per
-above.
+the last one. It's left-aligned, not centered with the hero text above it —
+only the title/blurb stay centered. No separate category-name heading above
+the grid either: the spinner and tree nav already say which category is
+active, so repeating it there was redundant. `ExpandCell` reads "See all
+visuals," not "+ Expand" — no border, no icon, deliberately lighter-weight
+than the cards so it doesn't compete with them. It's disabled rather than a
+dead link — `/c/:slug` isn't built, so there's nowhere for it to go yet. No
+router either, per above.
+
+`VisualPreviewCard` scales up on hover (with a shadow and a higher
+`z-index` so it doesn't get covered by its grid neighbors) — the point is to
+make a genuinely tiny thumbnail (an SVG shrunk into a 1:1 box) briefly
+legible without needing a real lightbox or a second page.
 
 ---
 

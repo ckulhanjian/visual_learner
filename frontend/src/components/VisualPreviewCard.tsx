@@ -21,7 +21,7 @@ function toSvgDataUri(source: string): string {
 
 export function VisualPreviewCard({ visual }: VisualPreviewCardProps) {
   return (
-    <li className="border-line flex flex-col overflow-hidden rounded-lg border text-left">
+    <li className="border-line group bg-paper relative flex flex-col overflow-hidden rounded-lg border text-left transition-transform duration-200 ease-out hover:z-10 hover:scale-[1.15] hover:shadow-xl">
       <div className="bg-surface border-line flex aspect-square items-center justify-center overflow-hidden border-b">
         {visual.thumbnailSource ? (
           // Rendered via <img>, not dangerouslySetInnerHTML: a data URI loaded
@@ -31,7 +31,7 @@ export function VisualPreviewCard({ visual }: VisualPreviewCardProps) {
           <img
             src={toSvgDataUri(visual.thumbnailSource)}
             alt=""
-            className="h-full w-full object-contain p-2"
+            className="h-full w-full object-contain p-2 transition-all duration-200 group-hover:p-0"
           />
         ) : (
           <span className="text-ink-muted font-mono text-[10px] uppercase">{visual.kind}</span>

@@ -109,7 +109,7 @@ export function Home() {
           </p>
         </div>
 
-        <div className="mx-auto w-full max-w-xl text-left">
+        <div className="w-full max-w-xl text-left">
           {previewState.status === 'loading' && <p className="text-ink-muted font-mono text-xs">Loading…</p>}
           {previewState.status === 'error' && (
             <p className="font-mono text-xs text-red-700 dark:text-red-400">{previewState.message}</p>

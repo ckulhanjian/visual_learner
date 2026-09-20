@@ -3,21 +3,21 @@ interface ExpandCellProps {
 }
 
 // The 4th cell in the preview grid — stubbed, since /c/:slug isn't built yet
-// (see docs/DECISIONS.md). Disabled rather than a dead link.
+// (see docs/DECISIONS.md). Disabled rather than a dead link. Deliberately
+// understated next to the visual cards: no border, no icon, just a link-like
+// label, so it reads as "there's more" rather than competing with the cards.
 export function ExpandCell({ categoryColor }: ExpandCellProps) {
   return (
-    <li>
+    <li className="flex aspect-square items-center justify-center">
       <button
         type="button"
         disabled
         aria-disabled="true"
         title="Category pages aren't built yet"
-        className="border-line text-ink-muted flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed font-mono text-xs opacity-60"
+        className="rounded px-2 py-1 font-mono text-xs opacity-70"
+        style={{ color: categoryColor }}
       >
-        <span className="text-xl leading-none" style={{ color: categoryColor }}>
-          +
-        </span>
-        Expand
+        See all visuals
       </button>
     </li>
   )
