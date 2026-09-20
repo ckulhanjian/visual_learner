@@ -102,7 +102,7 @@ export function Home() {
 
       <main className="flex flex-1 flex-col gap-10 px-6 py-16 lg:flex-row lg:gap-6">
         <div className="flex flex-1 flex-col gap-10">
-          <div className="mx-auto max-w-xl space-y-3 text-center lg:mx-0 lg:text-left">
+          <div className="mx-auto max-w-xl space-y-3 text-center">
             <h1 className="font-body text-3xl italic md:text-4xl">A personal atlas of visualizations</h1>
             <p className="text-ink-muted">
               Physics, signals and systems, programming, circuits — written by hand, generated,
@@ -110,7 +110,7 @@ export function Home() {
             </p>
           </div>
 
-          <div className="w-full max-w-3xl text-left">
+          <div className="w-full text-left">
             {previewState.status === 'loading' && <p className="text-ink-muted font-mono text-xs">Loading…</p>}
             {previewState.status === 'error' && (
               <p className="font-mono text-xs text-red-700 dark:text-red-400">{previewState.message}</p>

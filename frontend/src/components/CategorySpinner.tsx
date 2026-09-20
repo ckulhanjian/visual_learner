@@ -25,9 +25,14 @@ const CONTAINER_WIDTH = 560
 // Tall enough that the most-rotated labels' bounding boxes (bigger now that
 // the font is bigger — rotation turns label height into real vertical
 // extent) stay inside this box's own clip, rather than getting cut off top
-// or bottom. There's ample vertical room to spend: this column stretches to
-// the page's full available height and is vertically centered in it.
+// or bottom. Used as a `min(px, vh)` ceiling below, not applied directly —
+// a flex child forced to this height pushes its whole row taller than the
+// viewport when there isn't 620px of slack (a short/laptop-height window),
+// shoving the footer below the fold instead of just leaving it visible.
+// The vh term makes short viewports clip the farthest labels a little
+// sooner instead, which is the smaller cost.
 const CONTAINER_HEIGHT = 620
+const CONTAINER_HEIGHT_CSS = `min(${CONTAINER_HEIGHT}px, 65vh)`
 const SPIRAL_SIZE = 200
 // Extra push past RADIUS so labels clear the dot with visible daylight
 // between them, instead of the label's edge sitting right up against it.
@@ -180,7 +185,7 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
           tabIndex={0}
           className="relative overflow-hidden focus:outline-none"
           style={{
-            height: CONTAINER_HEIGHT,
+            height: CONTAINER_HEIGHT_CSS,
             width: CONTAINER_WIDTH,
             maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
           }}

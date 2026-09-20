@@ -183,6 +183,12 @@ export function FibonacciSpiral({ progress, color }: FibonacciSpiralProps) {
       viewBox={VIEW_BOX}
       aria-hidden="true"
       shapeRendering="crispEdges"
+      // The underlying Fibonacci-squares construction grows wider than tall
+      // (successive squares approach the golden ratio, ~1.6:1) — rotating
+      // the whole rendered grid 90° turns that long axis vertical without
+      // touching the geometry/rasterization math, which doesn't care about
+      // screen orientation.
+      style={{ transform: 'rotate(90deg)' }}
       className="pointer-events-none absolute inset-0 h-full w-full"
     >
       {cells.slice(0, visibleCount).map((cell, index) => (

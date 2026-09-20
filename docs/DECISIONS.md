@@ -169,9 +169,22 @@ exceeding both `CONTAINER_WIDTH` and `CONTAINER_HEIGHT` — the container's own
 "Circuits" rendering as "cuits"). That box's edges are a deliberate clip
 (the left edge in particular is what keeps the spinner off the grid), so the
 fix was giving labels more room inside it — `CONTAINER_WIDTH` 440 → 560,
-`CONTAINER_HEIGHT` 420 → 620 — not loosening the clip. The height has ample
-budget to spend: the column stretches to the page's full available height
-and centers within it, so growing it doesn't compete with anything.
+`CONTAINER_HEIGHT` 420 → 620 — not loosening the clip.
+
+That second number turned out not to have the "ample budget" its own comment
+claimed. `CONTAINER_HEIGHT` sizes a plain block div, and a flex child holding
+one can't shrink below it (flexbox's default `min-height: auto`) — so on a
+window short enough that `main` doesn't have 620px of slack after the
+header, footer, and its own vertical padding, the whole page grew taller
+than the viewport to fit it, pushing the footer below the fold. On an
+ordinary laptop-height window (≈720–800px) that's not an edge case, it's the
+common one — reported as "the footer disappeared." Fixed by capping the
+actual CSS height at `min(620px, 65vh)` rather than applying 620 directly:
+tall windows still get the full 620 (no clipping regression), short ones
+get a smaller box and clip their farthest labels a little sooner instead of
+pushing the footer off-screen — the right side to give up, since a
+half-faded label near the edge of its visibility range is a smaller loss
+than the footer becoming unreachable without scrolling.
 
 **`CategoryTreeNav`** (header). A Khan Academy–style two-column menu: a
 fixed left list of categories, and a right pane — its own header plus a
@@ -204,17 +217,28 @@ a from-scratch `python run.py seed`) picks them up automatically; a
 dev database seeded before this change needs one `python run.py seed` run
 to catch up, and won't get there on its own.
 
-**The top-3 preview is a 4-column grid** (2 columns below `sm`, `max-w-3xl`
-rather than `max-w-xl` so tiles read as genuinely bigger on a wide screen),
-not a vertical list — visual cards fill the first slots, an `ExpandCell` is
-always the last one. It's left-aligned, not centered with the hero text
-above it — only the title/blurb stay centered. No separate category-name
-heading above the grid either: the spinner and tree nav already say which
-category is active, so repeating it there was redundant. `ExpandCell` reads
-"See all visuals," not "+ Expand" — no border, no icon, deliberately
-lighter-weight than the cards so it doesn't compete with them. It's disabled
-rather than a dead link — `/c/:slug` isn't built, so there's nowhere for it
-to go yet. No router either, per above.
+**The left column (from the page's left edge to the spinner's fixed-width
+column) is the page's whole "workspace," and everything in it centers or
+fills against that box, not the full viewport.** Originally the hero
+text stayed centered but the grid below it went left-aligned at `lg`,
+reasoning that a grid capped at `max-w-3xl` centered under a `max-w-xl`
+hero would look arbitrarily offset either way. Feedback reversed this: the
+hero text centers in the workspace at every width (no `lg:text-left`
+override), and **the top-3 preview grid now fills the workspace's full
+width** (`w-full`, no `max-w-3xl` cap) rather than being capped and
+left-aligned — both read as "centered/sized within this specific box," not
+within the page as a whole, which is what the workspace column actually is.
+Tiles get genuinely large on a wide screen as a direct consequence, which is
+the point, not a side effect to guard against.
+
+**The top-3 preview is a 4-column grid** (2 columns below `sm`), not a
+vertical list — visual cards fill the first slots, an `ExpandCell` is always
+the last one. No separate category-name heading above the grid either: the
+spinner and tree nav already say which category is active, so repeating it
+there was redundant. `ExpandCell` reads "See all visuals," not "+ Expand" —
+no border, no icon, deliberately lighter-weight than the cards so it doesn't
+compete with them. It's disabled rather than a dead link — `/c/:slug` isn't
+built, so there's nowhere for it to go yet. No router either, per above.
 
 `VisualPreviewCard` scales up on hover (with a shadow and a higher
 `z-index` so it doesn't get covered by its grid neighbors) — the point is to
@@ -255,6 +279,14 @@ Bresenham-style rasterization, computed once (`useState`'s lazy
 initializer) since the curve is static and the result never changes.
 `progress` then reveals a prefix of that cell list instead of a
 `stroke-dashoffset` fraction.
+
+The Fibonacci-squares construction itself grows wider than tall (each
+successive square approaches the golden ratio versus the accumulated
+rectangle, ~1.6:1) — it reads as horizontal by default. Feedback wanted it
+vertical, and rotating the whole rendered `<svg>` 90° (a CSS `transform`,
+not a change to the square/path/rasterization math) does that: the
+container it lives in is a square (`SPIRAL_SIZE` × `SPIRAL_SIZE`), so
+rotating in place doesn't shift or resize anything else.
 
 ---
 
