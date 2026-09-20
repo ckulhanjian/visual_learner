@@ -1,3 +1,6 @@
+import { displayColor } from '../theme/categoryColor'
+import { useTheme } from '../theme/useTheme'
+
 interface ExpandCellProps {
   categoryColor: string
 }
@@ -7,6 +10,7 @@ interface ExpandCellProps {
 // understated next to the visual cards: no border, no icon, just a link-like
 // label, so it reads as "there's more" rather than competing with the cards.
 export function ExpandCell({ categoryColor }: ExpandCellProps) {
+  const { theme } = useTheme()
   return (
     <li className="flex aspect-square items-center justify-center">
       <button
@@ -15,7 +19,7 @@ export function ExpandCell({ categoryColor }: ExpandCellProps) {
         aria-disabled="true"
         title="Category pages aren't built yet"
         className="rounded px-2 py-1 font-mono text-xs opacity-70"
-        style={{ color: categoryColor }}
+        style={{ color: displayColor(categoryColor, theme) }}
       >
         See all visuals
       </button>

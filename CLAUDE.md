@@ -97,10 +97,14 @@ Do not weaken these without an explicit decision recorded in `docs/DECISIONS.md`
 - **Type:** EB Garamond for body, JetBrains Mono for titles and code. Analog,
   old-school, slightly editorial.
 - **Color:** NYC subway lines as category identity. Physics `#EE352E`, Signals &
-  Systems `#0039A6`, Programming `#00933C`, Circuits `#FF6319`. Reserve `#B933AD`
-  and `#FCCC0A`.
-- **Light and dark both first-class.** Light is paper cream, dark is charcoal —
-  not pure black.
+  Systems `#0039A6`, Programming `#00933C`, Circuits `#FF6319`, Design `#FCCC0A`,
+  Music `#B933AD`, Economics `#6CBE45`, History `#A7A9AC`, Religion `#996633` —
+  every real subway line color is now spoken for; a 10th category needs a
+  decision recorded in `docs/DECISIONS.md`, not an invented hex.
+- **Light and dark both first-class — dark loads by default.** Light is paper
+  cream, dark is charcoal, not pure black. Category colors get perceptually
+  lightened for dark-mode text (`theme/categoryColor.ts`) — the canonical hex
+  above is the identity, not literally what renders on a dark background.
 - **Navigation** is two surfaces: an infinitely-wrapping category spinner (home
   page, wheel/arrow-key driven — see `docs/DECISIONS.md`) with a dot marker
   colored to match whichever category is active, and a separate tree dropdown

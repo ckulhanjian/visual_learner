@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CategoryTopics, TopicNode } from '../domain/Topic'
+import { displayColor } from '../theme/categoryColor'
+import { useTheme } from '../theme/useTheme'
 
 interface CategoryTreeNavProps {
   data: CategoryTopics[]
@@ -36,6 +38,7 @@ export function CategoryTreeNav({ data }: CategoryTreeNavProps) {
   const [open, setOpen] = useState(false)
   const [selectedSlug, setSelectedSlug] = useState<string | null>(data[0]?.categorySlug ?? null)
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const { theme } = useTheme()
 
   useEffect(() => {
     if (!open) return
@@ -79,7 +82,7 @@ export function CategoryTreeNav({ data }: CategoryTreeNavProps) {
                     onClick={() => setSelectedSlug(categorySlug)}
                     className="w-full rounded px-2 py-1.5 text-left font-mono text-xs transition-colors"
                     style={{
-                      color: categoryColor,
+                      color: displayColor(categoryColor, theme),
                       backgroundColor: isSelected ? 'var(--color-paper)' : 'transparent',
                     }}
                   >
@@ -95,7 +98,7 @@ export function CategoryTreeNav({ data }: CategoryTreeNavProps) {
               <div className="border-line border-b px-3 py-2">
                 <span
                   className="font-mono text-[11px] tracking-wide uppercase"
-                  style={{ color: selected.categoryColor }}
+                  style={{ color: displayColor(selected.categoryColor, theme) }}
                 >
                   {selected.categoryName}
                 </span>

@@ -57,10 +57,16 @@ failure mode is a silent 403 from a service you did not know was running. Vite o
 
 ### Theme default
 
-**Paper cream first.** The site loads light unless the visitor has toggled to
-dark before (persisted in `localStorage`, read before first paint to avoid a
-flash of the wrong theme — see `frontend/index.html`). Both stay first-class;
-this only decides the unauthenticated starting point.
+**Dark first** — supersedes the earlier "paper cream first" decision. The
+site loads dark unless the visitor has explicitly toggled to light before
+(persisted in `localStorage`, read before first paint to avoid a flash of
+the wrong theme — see `frontend/index.html`). Both stay first-class; this
+only decides the unauthenticated starting point. `useTheme.ts`'s
+`readStoredTheme` has to distinguish "nothing stored yet" from an explicit
+stored choice either way — with the old light-first default those collapsed
+into the same code path by coincidence, and flipping the default would have
+silently overridden a returning visitor's explicit light-mode choice if that
+distinction weren't made explicit.
 
 ### Frontend fonts
 
@@ -103,15 +109,50 @@ rotating past a full lap is already seamless — unlike the earlier
 slot-based approach this replaced, which needed a fractional-offset trick to
 fake the same continuity.
 
-The radius scales with `window.innerWidth` (down to `MIN_RADIUS_SCALE` at
-narrow desktop widths, in `CategorySpinner.tsx`) rather than staying fixed —
-a fixed-size circle tuned for a wide window reaches far enough left on a
-narrower one to overlap the centered preview grid. Below `sm` it's the
-tap-row fallback regardless, so this only covers the desktop range.
+**Layout: a real two-column flex row, not a `position: fixed` overlay with a
+JS-computed scale factor.** The first version made the spinner `fixed` in
+the corner and shrank its radius as a function of `window.innerWidth` to
+keep it clear of the (centered) preview grid — a heuristic approximating a
+constraint the layout didn't actually have. On a wide screen the two floated
+further apart than looked good; on some window sizes the heuristic still
+undershot and the spinner overlapped the grid. Home.tsx now gives the
+spinner its own fixed-width flex column (`lg:flex` with a set width)
+alongside the grid's column (`flex-1`, so it grows to fill whatever's left
+and gets meaningfully bigger tiles on a wide screen); the browser's layout
+engine makes overlap structurally impossible instead of approximately
+unlikely, and `CategorySpinner.tsx`'s own geometry constants (`RADIUS`,
+`CONTAINER_WIDTH`) go back to being fixed, tuned once for that column's
+fixed width. Vertical centering is now `items-center` on that flex column
+instead of a manual `top-1/2` / `-translate-y-1/2` transform on a fixed
+element. The breakpoint also moved from `sm` (640px) to `lg` (1024px) — a
+640px-wide left column left too little room for the now-bigger grid tiles,
+so the tap-row fallback now covers tablet widths too, not just phones.
 
 The dot marker is colored to match whichever category is currently active
 (the same rounded index `onActiveChange` uses), not a fixed color — it's
 what ties the dot to "these are that category's visuals" in the grid below.
+Category colors are perceptually lightened for dark-mode text rendering
+(`theme/categoryColor.ts`, applied uniformly to all categories rather than
+special-casing the one — `#0039A6` — that prompted it): the stored hex is
+still the canonical identity, this only affects how it's drawn as
+foreground text on a dark background.
+
+**`isActive` matches the committed index, not a distance threshold on the
+continuous position.** The wheel handler advances `position` by
+`deltaY * WHEEL_SENSITIVITY` per event, which doesn't land on exact integers
+(each wheel tick is empirically ~1.02 steps, not 1) — a threshold check like
+`Math.abs(diff) < 0.5 / count` drifts out of range after enough events and
+can leave no category marked active. `count` growing from 4 to 9 (see below)
+is what exposed this: the threshold shrinks with more categories, so the
+same drift that stayed inside a 4-category threshold fell outside a
+9-category one. Comparing directly against the same rounded index
+`onActiveChange` already committed to is immune to the drift by
+construction.
+
+**Font size and category count.** Labels moved from `text-sm` to `text-lg`,
+and `ANGLE_STEP_DEGREES` down slightly (22° → 20°) to keep 9 categories'
+worth of bigger text from crowding — see below for where the other 5
+categories came from.
 
 **`CategoryTreeNav`** (header). A Khan Academy–style two-column menu: a
 fixed left list of categories, and a right pane — its own header plus a
@@ -122,25 +163,50 @@ as the data goes. Not the same job as the spinner: this is direct lookup for
 someone who already knows what they want, the spinner is for browsing.
 
 **Category restructuring (e.g. introducing "Math" as a parent of "Physics")
-is explicitly not decided.** The four existing categories and their subway
-colors are unchanged. `topics` nest *within* a category; they don't let a
-category nest inside another one.
+is explicitly not decided.** `topics` nest *within* a category; they don't
+let a category nest inside another one.
 
-**The top-3 preview is a 4-column grid** (2 columns below `sm`), not a
-vertical list — visual cards fill the first slots, an `ExpandCell` is always
-the last one. It's left-aligned, not centered with the hero text above it —
-only the title/blurb stay centered. No separate category-name heading above
-the grid either: the spinner and tree nav already say which category is
-active, so repeating it there was redundant. `ExpandCell` reads "See all
-visuals," not "+ Expand" — no border, no icon, deliberately lighter-weight
-than the cards so it doesn't compete with them. It's disabled rather than a
-dead link — `/c/:slug` isn't built, so there's nowhere for it to go yet. No
-router either, per above.
+**Five more categories: Design, Music, Economics, History, Religion.**
+Colored with the rest of the real, unused NYC subway line colors — the two
+CLAUDE.md had already reserved (`#B933AD`, the 7 train; `#FCCC0A`,
+N/Q/R/W) plus three more (`#6CBE45` G train, `#A7A9AC` L train, `#996633`
+J/Z train). That's every real subway line color spoken for now; a 10th
+category needs an actual decision here, not an invented hex, since the
+whole point of the palette is that it's real subway identity, not a
+generated-to-taste one. None of the five have seed visuals yet — the empty
+grid state (the dashed "Empty" placeholders) was already built to handle
+that gracefully.
+
+**The top-3 preview is a 4-column grid** (2 columns below `sm`, `max-w-3xl`
+rather than `max-w-xl` so tiles read as genuinely bigger on a wide screen),
+not a vertical list — visual cards fill the first slots, an `ExpandCell` is
+always the last one. It's left-aligned, not centered with the hero text
+above it — only the title/blurb stay centered. No separate category-name
+heading above the grid either: the spinner and tree nav already say which
+category is active, so repeating it there was redundant. `ExpandCell` reads
+"See all visuals," not "+ Expand" — no border, no icon, deliberately
+lighter-weight than the cards so it doesn't compete with them. It's disabled
+rather than a dead link — `/c/:slug` isn't built, so there's nowhere for it
+to go yet. No router either, per above.
 
 `VisualPreviewCard` scales up on hover (with a shadow and a higher
 `z-index` so it doesn't get covered by its grid neighbors) — the point is to
 make a genuinely tiny thumbnail (an SVG shrunk into a 1:1 box) briefly
 legible without needing a real lightbox or a second page.
+
+**`FibonacciSpiral`** (`components/FibonacciSpiral.tsx`) draws behind the
+spinner's labels, tinted to the active category's color. It fills in
+progressively as the spinner turns and resets to undrawn the instant it
+wraps back to the first category — both for free, by reusing the spinner's
+own continuous, wrapping `position` rather than tracking separate state:
+`progress = (position mod count) / count` is 0 exactly when `position` is a
+multiple of `count` (the first category), so the "restart" isn't a special
+case, it's what that formula already does. The path itself is a standard
+Fibonacci-squares construction (fixed at 8 terms regardless of category
+count — more terms just makes for a bigger sprawling shape, not a more
+correct one) rendered as one continuous SVG `<path>` with `pathLength="1"`
+so `stroke-dashoffset` can reveal it proportionally without needing to
+compute the path's true geometric length.
 
 ---
 

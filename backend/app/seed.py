@@ -13,6 +13,14 @@ CATEGORIES = [
     {"name": "Signals & Systems", "color": "#0039A6", "blurb": "Transforms, filters, control.", "position": 1},
     {"name": "Programming", "color": "#00933C", "blurb": "Algorithms and data structures.", "position": 2},
     {"name": "Circuits", "color": "#FF6319", "blurb": "Analog and digital circuit design.", "position": 3},
+    # The rest of the real, unused NYC subway line colors — CLAUDE.md had
+    # reserved #B933AD (7 train) and #FCCC0A (N/Q/R/W) for exactly this; the
+    # other two (G train, L train, J/Z train) round out five new categories.
+    {"name": "Design", "color": "#FCCC0A", "blurb": "Typography, layout, visual systems.", "position": 4},
+    {"name": "Music", "color": "#B933AD", "blurb": "Theory, notation, sound.", "position": 5},
+    {"name": "Economics", "color": "#6CBE45", "blurb": "Markets, incentives, growth.", "position": 6},
+    {"name": "History", "color": "#A7A9AC", "blurb": "Timelines, causes, consequences.", "position": 7},
+    {"name": "Religion", "color": "#996633", "blurb": "Belief, ritual, tradition.", "position": 8},
 ]
 
 

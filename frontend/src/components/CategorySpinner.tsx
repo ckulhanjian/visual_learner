@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Category } from '../domain/Category'
+import { displayColor } from '../theme/categoryColor'
+import { useTheme } from '../theme/useTheme'
+import { FibonacciSpiral } from './FibonacciSpiral'
 
 interface CategorySpinnerProps {
   categories: Category[]
@@ -7,27 +10,24 @@ interface CategorySpinnerProps {
   onActiveChange: (category: Category) => void
 }
 
-const BASE_RADIUS = 190 // px from the (off-screen right) center to the selected label, at REFERENCE_WIDTH
-// The radius the layout was tuned at, and how far it's allowed to shrink.
-// Below sm this component switches to the tap-row fallback entirely, but
-// between sm and a full desktop window the fixed-size circle would reach far
-// enough left to overlap the centered preview grid — scaling it down with
-// the viewport keeps it clear.
-const REFERENCE_WIDTH = 1280
-const MIN_RADIUS_SCALE = 0.45
-// However wide the longest label ("Signals & Systems") plus its rotation
-// needs beyond the radius itself, or the text clips against the container.
-const LABEL_ALLOWANCE = 230
+// Fixed now, not scaled to window width — the spinner lives in its own
+// fixed-width flex column (see Home.tsx), so it structurally cannot
+// collide with the preview grid regardless of viewport size. A JS-computed
+// scale factor was a heuristic working around not having that real layout
+// constraint; the constraint is the actual fix.
+const RADIUS = 170
+const CONTAINER_WIDTH = 440
 const CONTAINER_HEIGHT = 420
+const SPIRAL_SIZE = 200
 const WHEEL_SENSITIVITY = 0.0032 // wheel deltaY px -> fraction of a step
-const DESKTOP_QUERY = '(min-width: 640px)' // Tailwind's sm
+const DESKTOP_QUERY = '(min-width: 1024px)' // Tailwind's lg — matches Home.tsx's column breakpoint
 const DEG_TO_RAD = Math.PI / 180
 // Degrees of arc between adjacent categories. Fixed, not 360/count: with as
 // few as 4 categories, dividing the full circle evenly would put immediate
 // neighbors 90° from the selected item — fully vertical, unreadable text.
 // "No duplicates" means never render a category twice, not that the handful
 // that exist must be spread across the whole circle.
-const ANGLE_STEP_DEGREES = 22
+const ANGLE_STEP_DEGREES = 20
 
 // Shortest signed distance from `value` to the nearest multiple of `modulus`,
 // e.g. wrapToHalfRange(3.2, 4) -> -0.8 (3.2 is 0.8 short of the next lap of 4).
@@ -48,20 +48,6 @@ function useIsDesktopWidth(): boolean {
   return isDesktop
 }
 
-function useWindowWidth(): number {
-  const [width, setWidth] = useState(() => window.innerWidth)
-
-  useEffect(() => {
-    function handleResize() {
-      setWidth(window.innerWidth)
-    }
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
-  return width
-}
-
 // A true circle whose center sits off-screen at the container's right edge:
 // the selected category always sits at the leftmost point of that circle
 // (radius pointing due left), and each neighboring category sits a fixed
@@ -70,15 +56,12 @@ function useWindowWidth(): number {
 // category and no repeats, wraparound needs no special-casing: angles are
 // periodic, so rotating past a full lap is already seamless.
 //
-// Below sm, this has nowhere to go without overlapping the preview content
+// Below lg, this has nowhere to go without overlapping the preview content
 // on a narrow viewport — a plain tap-to-select row takes over instead.
 export function CategorySpinner({ categories, activeSlug, onActiveChange }: CategorySpinnerProps) {
   const count = categories.length
   const isDesktopWidth = useIsDesktopWidth()
-  const windowWidth = useWindowWidth()
-  const radiusScale = Math.max(MIN_RADIUS_SCALE, Math.min(1, windowWidth / REFERENCE_WIDTH))
-  const radius = BASE_RADIUS * radiusScale
-  const containerWidth = radius + LABEL_ALLOWANCE
+  const { theme } = useTheme()
   const initialIndex = Math.max(
     0,
     categories.findIndex((category) => category.slug === activeSlug),
@@ -144,11 +127,16 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
   // Same rounding the wheel/keyboard handlers use to decide which category
   // is "active" — keeps the dot's color in lockstep with onActiveChange.
   const activeIndex = ((Math.round(position) % count) + count) % count
-  const activeColor = categories[activeIndex].color
+  const activeColor = displayColor(categories[activeIndex].color, theme)
+  // How far through one full lap of all categories the spinner has turned —
+  // wraps to 0 exactly when it lands back on the first category, which is
+  // what makes the spiral restart there instead of just looping its reveal.
+  const wrappedPosition = ((position % count) + count) % count
+  const lapProgress = wrappedPosition / count
 
   return (
     <>
-      <ul className="m-0 flex list-none flex-wrap justify-center gap-x-5 gap-y-2 p-0 sm:hidden">
+      <ul className="m-0 flex list-none flex-wrap justify-center gap-x-5 gap-y-2 p-0 lg:hidden">
         {categories.map((category) => (
           <li key={category.slug}>
             <button
@@ -159,7 +147,7 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
               }}
               className="whitespace-nowrap rounded-full px-2 py-1 font-mono text-sm"
               style={{
-                color: category.color,
+                color: displayColor(category.color, theme),
                 textDecoration: category.slug === activeSlug ? 'underline' : 'none',
               }}
             >
@@ -170,53 +158,66 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
       </ul>
 
       <div
-        aria-label="Categories"
-        role="listbox"
-        tabIndex={0}
-        className="fixed top-1/2 right-3 hidden -translate-y-1/2 overflow-hidden focus:outline-none sm:block"
-        style={{
-          height: CONTAINER_HEIGHT,
-          width: containerWidth,
-          maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
-        }}
+        className="hidden lg:flex lg:h-full lg:shrink-0 lg:items-center lg:justify-center"
+        style={{ width: CONTAINER_WIDTH }}
       >
-        {/* Sits just past the selected label's right edge, not on top of it —
-            both anchor from the same point, so without an offset the dot
-            would overlap the label's last character. Colored to match
-            whichever category is active, so it's clear which one the
-            preview grid below belongs to. */}
         <div
-          aria-hidden="true"
-          className="absolute h-2 w-2 -translate-y-1/2 rounded-full transition-colors duration-150"
-          style={{ right: radius - 14, top: '50%', backgroundColor: activeColor }}
-        />
-        {categories.map((category, index) => {
-          const diff = wrapToHalfRange(index - position, count)
-          const angleDeg = 180 - diff * ANGLE_STEP_DEGREES
-          const angleRad = angleDeg * DEG_TO_RAD
-          const x = radius * Math.cos(angleRad)
-          const y = radius * Math.sin(angleRad)
-          const rotation = -diff * ANGLE_STEP_DEGREES
-          const isActive = Math.abs(diff) < 0.5 / count
-          const opacity = Math.max(0.2, 1 - Math.abs(diff) / (count / 2))
-          return (
-            <div
-              key={category.slug}
-              role="option"
-              aria-selected={isActive}
-              className="absolute origin-right whitespace-nowrap font-mono text-sm"
-              style={{
-                right: -x,
-                top: `calc(50% + ${y}px)`,
-                transform: `translateY(-50%) rotate(${rotation}deg)`,
-                color: category.color,
-                opacity,
-              }}
-            >
-              {category.name}
-            </div>
-          )
-        })}
+          aria-label="Categories"
+          role="listbox"
+          tabIndex={0}
+          className="relative overflow-hidden focus:outline-none"
+          style={{
+            height: CONTAINER_HEIGHT,
+            width: CONTAINER_WIDTH,
+            maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
+          }}
+        >
+          <div className="absolute top-1/2 right-10 -translate-y-1/2" style={{ width: SPIRAL_SIZE, height: SPIRAL_SIZE }}>
+            <FibonacciSpiral progress={lapProgress} color={activeColor} />
+          </div>
+
+          {/* Sits just past the selected label's right edge, not on top of it —
+              both anchor from the same point, so without an offset the dot
+              would overlap the label's last character. Colored to match
+              whichever category is active, so it's clear which one the
+              preview grid below belongs to. */}
+          <div
+            aria-hidden="true"
+            className="absolute h-2.5 w-2.5 -translate-y-1/2 rounded-full transition-colors duration-150"
+            style={{ right: RADIUS - 16, top: '50%', backgroundColor: activeColor }}
+          />
+          {categories.map((category, index) => {
+            const diff = wrapToHalfRange(index - position, count)
+            const angleDeg = 180 - diff * ANGLE_STEP_DEGREES
+            const angleRad = angleDeg * DEG_TO_RAD
+            const x = RADIUS * Math.cos(angleRad)
+            const y = RADIUS * Math.sin(angleRad)
+            const rotation = -diff * ANGLE_STEP_DEGREES
+            // Matches whichever index onActiveChange actually committed to,
+            // not a distance threshold on the raw continuous position — that
+            // drifts slightly off exact integers after enough wheel deltas
+            // (each ~1.02 steps, not exactly 1), so a threshold check could
+            // land between two categories and mark neither one active.
+            const isActive = index === activeIndex
+            const opacity = Math.max(0.2, 1 - Math.abs(diff) / (count / 2))
+            return (
+              <div
+                key={category.slug}
+                role="option"
+                aria-selected={isActive}
+                className="absolute top-1/2 origin-right whitespace-nowrap font-mono text-lg"
+                style={{
+                  right: -x,
+                  transform: `translateY(calc(-50% + ${y}px)) rotate(${rotation}deg)`,
+                  color: displayColor(category.color, theme),
+                  opacity,
+                }}
+              >
+                {category.name}
+              </div>
+            )
+          })}
+        </div>
       </div>
     </>
   )

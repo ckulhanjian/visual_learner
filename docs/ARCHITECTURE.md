@@ -12,9 +12,9 @@ Three layers.
 ```
 React (TypeScript, Vite, Tailwind v4)        :5173
   pages/        five routes, compose only
-  components/   ConceptForm, ArcNav, VisualCard, MarkdownBody
+  components/   ConceptForm, CategorySpinner, CategoryTreeNav, VisualPreviewCard, MarkdownBody
   renderers/    one file per kind + the registry
-  domain/       Visual, Category, Tag types
+  domain/       Visual, Category, Tag, Topic types
   api/          the only place fetch() appears
         │
         │  JSON over HTTP
@@ -256,21 +256,26 @@ instead of forcing one into multipart encoding it does not need.
 Two nav surfaces, not one:
 
 - **`CategorySpinner`** — categories arranged on a true circle whose center
-  sits off-screen at the container's right edge, vertically centered, infinitely
+  sits off-screen at the right edge of its own fixed-width flex column
+  (vertically centered by that column, not by manual positioning), infinitely
   wrapping. Driven by wheel delta and arrow keys (not real page scroll — the
-  page itself doesn't move), with a blue dot marking whichever category is
-  centered. See `docs/DECISIONS.md` for the geometry and why it isn't real
-  scroll.
+  page itself doesn't move), with a dot marking whichever category is
+  centered, colored to match it, and a `FibonacciSpiral` drawing in behind
+  the labels as the spinner turns. Below `lg` (1024px) it's a plain
+  tap-to-select row instead. See `docs/DECISIONS.md` for the geometry, the
+  column layout, and why it isn't real scroll.
 - **`CategoryTreeNav`** — a Khan Academy–style two-column header dropdown
   (categories on the left, a scrollable topic list on the right), backed by
   `GET /topics`. Category → topic → sub-topic, as deep as the data goes.
 
-Whichever category is centered in the spinner drives a 4-column preview grid
-(below the title/blurb) of that category's most recent three published
-visuals plus a stubbed `ExpandCell` as the 4th slot — `/c/:slug` doesn't
-exist yet, so it's disabled rather than a dead link. No separate heading
-names the active category above the grid; the spinner and tree nav already
-show that.
+The page body is two flex columns at `lg`+: the hero text, blurb, and preview
+grid on the left (grows to fill the space, `max-w-3xl`), the spinner in its
+own fixed-width column on the right. Whichever category is centered in the
+spinner drives the 4-column preview grid of that category's most recent
+three published visuals plus a stubbed `ExpandCell` as the 4th slot —
+`/c/:slug` doesn't exist yet, so it's disabled rather than a dead link. No
+separate heading names the active category above the grid; the spinner and
+tree nav already show that.
 
 The footer carries a copyright line and a link to the repo.
 
@@ -303,9 +308,10 @@ src/
   domain/       Visual, Category, Tag, Topic — types and logic on them
   renderers/    one file per kind; the registry mapping kind → renderer
   components/   ConceptForm, CategorySpinner, CategoryTreeNav, VisualPreviewCard,
-                ExpandCell, SiteFooter, MarkdownBody
+                ExpandCell, FibonacciSpiral, SiteFooter, MarkdownBody
   pages/        one file per route, mostly composing the above
-  theme/        tokens, subway palette, dark mode
+  theme/        tokens, subway palette, dark mode, categoryColor (dark-mode
+                lightening of category colors for text)
 ```
 
 Markdown and LaTeX: `react-markdown` + `remark-math` + `rehype-katex`. Notes are

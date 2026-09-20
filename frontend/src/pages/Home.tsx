@@ -100,36 +100,44 @@ export function Home() {
         <ThemeToggle theme={theme} onToggle={toggleTheme} />
       </header>
 
-      <main className="relative flex flex-1 flex-col gap-10 px-6 py-16">
-        <div className="mx-auto max-w-xl space-y-3 text-center">
-          <h1 className="font-body text-3xl italic md:text-4xl">A personal atlas of visualizations</h1>
-          <p className="text-ink-muted">
-            Physics, signals and systems, programming, circuits — written by hand, generated,
-            or uploaded, each with the math and the story behind it.
-          </p>
-        </div>
+      <main className="flex flex-1 flex-col gap-10 px-6 py-16 lg:flex-row lg:gap-6">
+        <div className="flex flex-1 flex-col gap-10">
+          <div className="mx-auto max-w-xl space-y-3 text-center lg:mx-0 lg:text-left">
+            <h1 className="font-body text-3xl italic md:text-4xl">A personal atlas of visualizations</h1>
+            <p className="text-ink-muted">
+              Physics, signals and systems, programming, circuits — written by hand, generated,
+              or uploaded, each with the math and the story behind it.
+            </p>
+          </div>
 
-        <div className="w-full max-w-xl text-left">
-          {previewState.status === 'loading' && <p className="text-ink-muted font-mono text-xs">Loading…</p>}
-          {previewState.status === 'error' && (
-            <p className="font-mono text-xs text-red-700 dark:text-red-400">{previewState.message}</p>
-          )}
-          {previewState.status === 'ready' && activeCategory && (
-            <ul className="m-0 grid grid-cols-2 gap-3 p-0 sm:grid-cols-4">
-              {Array.from({ length: PREVIEW_COUNT }, (_, i) => previewState.data[i] ?? null).map((visual, i) =>
-                visual ? (
-                  <VisualPreviewCard key={visual.slug} visual={visual} />
-                ) : (
-                  <li
-                    key={`empty-${i}`}
-                    className="border-line text-ink-muted flex aspect-square items-center justify-center rounded-lg border border-dashed font-mono text-[10px] uppercase"
-                  >
-                    Empty
-                  </li>
-                ),
-              )}
-              <ExpandCell categoryColor={activeCategory.color} />
-            </ul>
+          <div className="w-full max-w-3xl text-left">
+            {previewState.status === 'loading' && <p className="text-ink-muted font-mono text-xs">Loading…</p>}
+            {previewState.status === 'error' && (
+              <p className="font-mono text-xs text-red-700 dark:text-red-400">{previewState.message}</p>
+            )}
+            {previewState.status === 'ready' && activeCategory && (
+              <ul className="m-0 grid grid-cols-2 gap-4 p-0 sm:grid-cols-4">
+                {Array.from({ length: PREVIEW_COUNT }, (_, i) => previewState.data[i] ?? null).map((visual, i) =>
+                  visual ? (
+                    <VisualPreviewCard key={visual.slug} visual={visual} />
+                  ) : (
+                    <li
+                      key={`empty-${i}`}
+                      className="border-line text-ink-muted flex aspect-square items-center justify-center rounded-lg border border-dashed font-mono text-[10px] uppercase"
+                    >
+                      Empty
+                    </li>
+                  ),
+                )}
+                <ExpandCell categoryColor={activeCategory.color} />
+              </ul>
+            )}
+          </div>
+
+          {categoriesState.status === 'error' && (
+            <p className="text-ink-muted font-mono text-xs">
+              Couldn't load categories: {categoriesState.message}
+            </p>
           )}
         </div>
 
@@ -139,11 +147,6 @@ export function Home() {
             activeSlug={activeCategory?.slug ?? null}
             onActiveChange={setActiveCategory}
           />
-        )}
-        {categoriesState.status === 'error' && (
-          <p className="text-ink-muted absolute right-6 bottom-6 font-mono text-xs">
-            Couldn't load categories: {categoriesState.message}
-          </p>
         )}
       </main>
 
