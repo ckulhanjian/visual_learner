@@ -1,4 +1,5 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { CategoriesPage } from './pages/CategoriesPage'
 import { CategoryPage } from './pages/CategoryPage'
 import { Home } from './pages/Home'
 
@@ -9,6 +10,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/categories" element={<CategoriesPage />} />
         <Route path="/c/:slug" element={<CategoryPage />} />
       </Routes>
     </BrowserRouter>

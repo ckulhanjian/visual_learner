@@ -11,8 +11,8 @@ Three layers.
 
 ```
 React (TypeScript, Vite, Tailwind v4)        :5173
-  pages/        five routes, compose only (two built: Home, CategoryPage)
-  components/   ConceptForm, CategorySpinner, CategoryTreeNav, VisualPreviewCard, MarkdownBody
+  pages/        five routes, compose only (three built: Home, CategoriesPage, CategoryPage)
+  components/   ConceptForm, CategorySpinner, CategoryBubbleChart, VisualPreviewCard, MarkdownBody
   renderers/    one file per kind + the registry
   domain/       Visual, Category, Tag types
   api/          the only place fetch() appears
@@ -245,6 +245,7 @@ instead of forcing one into multipart encoding it does not need.
 | route | shows | data |
 |---|---|---|
 | `/` | category spinner + top-3 preview of the active category, subway-colored | `GET /categories`, `GET /visuals?category=...` |
+| `/categories` | every category as an embedded bubble chart to pick from | `GET /categories` |
 | `/c/:slug` | category name + blurb, 3-column grid of every published visual | `GET /categories/:slug` |
 | `/v/:slug` | full-bleed visual, expand toggle, metadata and notes below | `GET /visuals/:slug` |
 | `/submit` | ConceptForm + upload or paste | `GET /categories`, `GET /tags`, `GET /meta`, `POST /visuals` |
@@ -267,13 +268,9 @@ Two nav surfaces, not one:
   unsupported). Below `lg` (1024px) it's a plain tap-to-select row instead.
   See `docs/DECISIONS.md` for the geometry, the column layout, and why it
   isn't real scroll.
-- **`CategoryTreeNav`** — the header's "Categories" dropdown: every category
-  as a bubble, diameter scaled by its published-visual count, backed by
-  `GET /categories`. Hovering a bubble (not clicking) shows that category's
-  visuals in a pane on the right (`GET /visuals?category=...`, one request
-  per category, fetched once on first open and cached); clicking one
-  navigates to its page (`/c/:slug`). No topics here any more — see
-  `docs/DECISIONS.md`.
+- **The header's "Categories" link** — goes to its own page, `/categories`
+  (below), rather than opening a dropdown in place. No topics here any
+  more — see `docs/DECISIONS.md`.
 
 The page body is two flex columns at `lg`+: the hero text and (once a real
 category is active) the preview grid on the left, the spinner in its own
@@ -289,14 +286,25 @@ the active category above the grid; the spinner and tree nav already show
 that.
 
 The footer carries a copyright line, a link to the repo, and a one-line
-gloss on the name ("Intueri is a Latin verb meaning..."). `SiteHeader`
-(logo linking home, `CategoryTreeNav`, theme toggle) is shared with every
-other page rather than each one implementing its own copy — its dropdown
-button reads "Category: <name>" instead of "Categories" while `/c/:slug`
+gloss on the name ("Achk (աչք) is the Armenian word for 'eye.'"). `SiteHeader`
+(logo linking home, a "Categories" link, theme toggle) is shared with every
+other page rather than each one implementing its own copy — that link
+reads "Category: <name>" instead of "Categories" while `/c/:slug`
 is open (an optional prop `CategoryPage` passes once its category has
 loaded), and that page carries a "← Home" link back to `/?category=:slug`
 so the spinner lands back on the category the visitor came from, not the
 unselected `HOME_CATEGORY` slot — see `docs/DECISIONS.md`.
+
+### `/categories`
+
+Every category as an embedded chart to pick from, on its own page rather
+than a header dropdown — `CategoryBubbleChart`, backed by one `GET
+/categories` call. Each category renders as a circle sized by its
+published-visual count (`bubbleSize`, same linear interpolation as the
+dropdown version it replaced), outlined in the category's own subway
+color with no fill, name and count in white text inside it. Clicking one
+navigates straight to `/c/:slug`. No hover-to-preview pane — see
+`docs/DECISIONS.md` for what that traded away.
 
 ### `/c/:slug`
 
@@ -343,15 +351,15 @@ src/
                 for "no category selected"; LoadState.ts is the
                 {loading|ready|error} shape every page's own fetches use).
                 No Topic.ts — the frontend stopped consuming `/topics` once
-                CategoryTreeNav switched to a category+visuals bubble
-                picker (docs/DECISIONS.md); the backend model and endpoint
+                the category picker switched to a bubble chart
+                (docs/DECISIONS.md); the backend model and endpoint
                 are untouched, just not called from here any more.
   hooks/        small hooks shared across components (useIsDesktopWidth)
   renderers/    one file per kind; the registry mapping kind → renderer
-  components/   ConceptForm, CategorySpinner, CategoryTreeNav, VisualPreviewCard,
+  components/   ConceptForm, CategorySpinner, CategoryBubbleChart, VisualPreviewCard,
                 ExpandCell, SiteHeader, SiteFooter, MarkdownBody
   pages/        one file per route, mostly composing the above (Home,
-                CategoryPage)
+                CategoriesPage, CategoryPage)
   theme/        tokens, subway palette, dark mode, categoryColor (dark-mode
                 lightening of category colors for text)
 ```

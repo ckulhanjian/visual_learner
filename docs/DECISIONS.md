@@ -86,6 +86,17 @@ own; CLAUDE.md's own security invariants document `X-Atlas-Key` by that
 exact name, so changing it needs its own decision, not a side effect of
 this one.
 
+### Renamed to Achk
+
+Renamed again, from **Intueri** to **Achk** — the Armenian word for "eye"
+(աչք) — with the footer's etymology gloss updated to match ("Achk (աչք) is
+the Armenian word for 'eye.'"). Same scope as the Intueri rename above and
+for the same reason: the logo, page `<title>`/meta description, and
+footer changed; the hero heading was not touched this time (no new
+heading was requested to replace "The Art of Visualization"). The
+internal `ATLAS_*`/`X-Atlas-Key`/`atlas-theme` identifiers again stay as
+they are, unaffected by a display-name change.
+
 ### Frontend fonts
 
 Self-hosted via `@fontsource`, latin-only subsets — pulling the default
@@ -290,6 +301,35 @@ side-by-side) — the wider fixed panel that comfortably fit nine bubbles
 plus a right pane at desktop widths overflowed a 390px phone screen
 entirely off the right edge otherwise, taking the whole visuals pane out
 of view along with it.
+
+**`CategoryTreeNav` superseded again: moved out of the header entirely,
+onto its own page.** The dropdown above — bubbles plus a hover-to-preview
+visuals pane, backed by a pastel fill — was itself replaced after
+feedback ("I want a separate page for categories... this is where the
+circle will live... it can just be an embedded chart"). `CategoryTreeNav.tsx`
+is deleted; `SiteHeader`'s "Categories" element is now a plain `Link` to a
+new route, `/categories` (`CategoriesPage.tsx`), which renders the bubbles
+as `CategoryBubbleChart.tsx` — one `GET /categories` call, no per-category
+visuals fetch, no hover state. Clicking a bubble is the only interaction:
+straight to `/c/:slug`. The hover-to-preview-visuals pane was dropped
+rather than carried over — "just an embedded chart" and a page with room
+to show name and count directly on each bubble both argued against
+reproducing a popover's compromises on a page that no longer needs them.
+If hover preview turns out to be missed, it can come back; nothing about
+deleting it was load-bearing elsewhere.
+
+**Fill removed, text set to plain white — explicitly provisional.**
+Feedback on the pastel-filled version was "I don't like the design of
+them, remove the fill for now and just use white text." `CategoryBubbleChart`
+implements this literally: `border-2` in the category's own subway color,
+no `background`, name and count in flat `text-white` — not run through
+`displayColor`/`pastelize` or branched on `theme` at all, since the
+instruction was for a specific fixed color, not a lightened one.
+**Known limit, not yet addressed:** white text on the light-theme cream
+background is low-contrast to the point of being hard to read — "for now"
+in the feedback is read literally, so this hasn't been fixed
+unilaterally. Revisit if asked, e.g. theme-conditional text color or an
+outline/shadow behind the label.
 
 **Category restructuring (e.g. introducing "Math" as a parent of "Physics")
 is explicitly not decided.** `topics` nest *within* a category; they don't

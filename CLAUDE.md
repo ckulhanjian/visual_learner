@@ -18,7 +18,7 @@ submit is visible until it is reviewed.
 | | |
 |---|---|
 | Backend | Flask + SQLAlchemy + Marshmallow, SQLite. |
-| Frontend | React + TypeScript + Vite + Tailwind v4. `react-router-dom` for the two routes that exist: `/` (spinner, theme, layout) and `/c/:slug` (a category's full visual list) — the other three routes aren't built. Plain HTML/JS test page (`frontend-test/`) still around for raw API poking. |
+| Frontend | React + TypeScript + Vite + Tailwind v4. `react-router-dom` for the three routes that exist: `/` (spinner, theme, layout), `/categories` (every category as an embedded bubble chart), and `/c/:slug` (a category's full visual list) — the other two routes aren't built. Plain HTML/JS test page (`frontend-test/`) still around for raw API poking. |
 | Deferred | Vega-Lite and the `/create` editor page, p5.js, Postgres, Alembic. |
 
 ## Commands
@@ -107,15 +107,15 @@ Do not weaken these without an explicit decision recorded in `docs/DECISIONS.md`
   above is the identity, not literally what renders on a dark background.
 - **Navigation** is two surfaces: a discrete, wheel/arrow-key-driven category
   spinner (home page — see `docs/DECISIONS.md`) with a dot marker colored to
-  match whichever category is active, and a "Categories" dropdown in the
-  header showing every category as a bubble sized by its published-visual
-  count (hover one to preview its visuals on the right, click to go to its
-  page). The spinner never navigates by itself — "See more" on the home
-  page's preview grid is its one link into a category's full page
-  (`/c/:slug`). While that page is open, the dropdown's own button reads
-  "Category: <name>" instead of "Categories," and a "← Home" link on the
-  page returns to the spinner with that same category selected, not reset
-  to the unselected state.
+  match whichever category is active, and a "Categories" link in the header
+  that goes to its own page (`/categories`) showing every category as an
+  embedded bubble chart — outlined circles, no fill, sized by published-visual
+  count, white text, click one to go to its page. The spinner never navigates
+  by itself — "See more" on the home page's preview grid is its one link into
+  a category's full page (`/c/:slug`). While that page is open, the header
+  link reads "Category: <name>" instead of "Categories," and a "← Home" link
+  on the page returns to the spinner with that same category selected, not
+  reset to the unselected state.
 - **"Full screen"** means an expanded-layout toggle, never the browser Fullscreen
   API — it behaves inconsistently and traps keyboard handling.
 
