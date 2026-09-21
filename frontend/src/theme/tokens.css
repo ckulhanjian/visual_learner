@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@plugin '@tailwindcss/typography';
 /* latin-only subsets — the full 400.css pulls in cyrillic/greek/vietnamese too */
 @import '@fontsource/eb-garamond/latin-400.css';
 @import '@fontsource/eb-garamond/latin-500.css';
@@ -96,7 +97,9 @@ body {
    the spinner lands on a new one), targeting its own direct children —
    VisualPreviewCard's <li>, ExpandCell's <li>, and the empty-slot
    placeholder — without either of those components needing to know this
-   animation exists. */
+   animation exists. All children share one delay (0ms) so the whole row
+   comes up together — an earlier per-nth-child delay staggered them left
+   to right instead, which feedback asked to remove. */
 @keyframes fade-in-up {
   from {
     opacity: 0;
@@ -107,19 +110,7 @@ body {
     transform: translateY(0);
   }
 }
-.animate-fade-in-up-stagger > * {
+.animate-fade-in-up-group > * {
   opacity: 0;
   animation: fade-in-up 420ms ease-out forwards;
-}
-.animate-fade-in-up-stagger > *:nth-child(1) {
-  animation-delay: 0ms;
-}
-.animate-fade-in-up-stagger > *:nth-child(2) {
-  animation-delay: 60ms;
-}
-.animate-fade-in-up-stagger > *:nth-child(3) {
-  animation-delay: 120ms;
-}
-.animate-fade-in-up-stagger > *:nth-child(4) {
-  animation-delay: 180ms;
 }

@@ -13,6 +13,14 @@ export default defineConfig({
         target: 'http://localhost:5001',
         changeOrigin: true,
       },
+      // Image-kind visuals' asset_path points at Flask's own /uploads/...
+      // route (app/__init__.py), not the API — proxied too so an <img>
+      // pointed straight at that path works in dev the same way it will
+      // once both are served from one origin in production.
+      '/uploads': {
+        target: 'http://localhost:5001',
+        changeOrigin: true,
+      },
     },
   },
 })

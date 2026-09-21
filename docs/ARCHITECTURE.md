@@ -11,9 +11,12 @@ Three layers.
 
 ```
 React (TypeScript, Vite, Tailwind v4)        :5173
-  pages/        five routes, compose only (three built: Home, CategoriesPage, CategoryPage)
-  components/   ConceptForm, CategorySpinner, CategoryTreeNav, CategoryBubbleChart, VisualPreviewCard, MarkdownBody
-  renderers/    one file per kind + the registry
+  pages/        seven routes, compose only (five built: Home, CategoriesPage,
+                CategoryPage, VisualPage, InspoPage)
+  components/   ConceptForm, CategorySpinner, CategoryTreeNav, CategoryBubbleChart,
+                CategoryAsciiArt, VisualPreviewCard, MarkdownBody
+  renderers/    one file per kind (svg, image, sandboxedIframe for d3/html/p5)
+                + registry.tsx (chartjs/vega placeholder pending their own libraries)
   domain/       Visual, Category, Tag types
   api/          the only place fetch() appears
         │
@@ -248,6 +251,7 @@ instead of forcing one into multipart encoding it does not need.
 | `/categories` | every category as an embedded bubble chart to pick from | `GET /categories` |
 | `/c/:slug` | category name + blurb, 3-column grid of every published visual | `GET /categories/:slug` |
 | `/v/:slug` | full-bleed visual, expand toggle, metadata and notes below | `GET /visuals/:slug` |
+| `/inspo` | a Pinterest board of sample visualizations, embedded | none — Pinterest's own widget |
 | `/submit` | ConceptForm + upload or paste | `GET /categories`, `GET /tags`, `GET /meta`, `POST /visuals` |
 | `/create` | *deferred with Vega* — editor, live preview, same ConceptForm | as submit |
 | `/review` | *proposed* — pending queue with publish/archive | `GET /visuals?status=pending` |
@@ -286,16 +290,15 @@ grid appearing below it once the spinner moves off slot 0 — animated between
 them with a `transform`, not a layout change. Whichever category is centered
 in the spinner drives the 4-column preview grid (`w-full` of that left
 column, shifted right of the hero above it) of that category's most recent
-three published visuals plus an `ExpandCell` ("See more," an arrow fading in
-on hover) as the 4th slot, linking to `/c/:slug`. The grid itself fades and
-slides up into place (keyed by slug, so it replays every time the spinner
-lands on a new category, not just on first render — see `docs/DECISIONS.md`).
-No separate heading names the active category above the grid; the spinner
-and tree nav already show that.
-
-The active category's `CategoryAsciiArt` emblem floats gently behind the
-hero title, low-opacity and `aria-hidden` — see `domain/categoryArt.ts`
-and `docs/DECISIONS.md`.
+three published visuals (each linking to its own `/v/:slug`) plus an
+`ExpandCell` ("See more," an arrow fading in on hover) as the 4th slot,
+linking to `/c/:slug`. The whole grid fades and slides up into place
+together, not staggered card by card (keyed by slug, so it replays every
+time the spinner lands on a new category, not just on first render — see
+`docs/DECISIONS.md`). No separate heading names the active category above
+the grid; the spinner and tree nav already show that. No `CategoryAsciiArt`
+here — that's category-page-only, see `/c/:slug` below and
+`docs/DECISIONS.md`.
 
 The footer carries a copyright line, a link to the repo, and a one-line
 gloss on the name ("Achk (աչք) is the Armenian word for 'eye.'"). `SiteHeader`
@@ -334,24 +337,54 @@ top-3 preview. A slug with no matching category (`not_found`, 404) renders
 as "Category not found," not a generic error; a category with zero
 published visuals renders its name and blurb with "No published visuals
 yet." instead of an empty grid. `VisualPreviewCard`, reused as-is from the
-home page's preview grid. The category's `CategoryAsciiArt` emblem pulses
-gently behind its title, same component and low-opacity treatment as the
-home page's hero, `animation="pulse"` instead of `"float"` there. No
-dedicated "back to home" link — the header logo does that job, see `/`
-above and `docs/DECISIONS.md`.
+home page's preview grid, now links each card to its own `/v/:slug`. The
+category's `CategoryAsciiArt` emblem pulses gently behind its title — the
+only page that shows one; the home page dropped its own after feedback
+(`docs/DECISIONS.md`). A small "← All Categories" line sits above the
+title, left-justified with it, linking to `/categories` — separate from
+the header logo, which instead carries you back to the spinner with this
+category still selected (see `/` above and `docs/DECISIONS.md`).
 
 ### `/v/:slug`
 
-Full-bleed visual at the top, notes below. "Full screen" is an expanded-layout
-toggle — a CSS class flip giving the visual the viewport — never the browser
-Fullscreen API.
+Full-bleed visual at the top (`renderers/registry.tsx`'s `VisualRenderer`
+— `svg` and `image` render for real; `d3`/`html`/`p5` render in the
+sandboxed iframe CLAUDE.md's security invariant requires; `chartjs`/`vega`
+fall back to an honest "renderer not built yet" placeholder rather than a
+blank box, since neither library is wired in yet — see
+`docs/DECISIONS.md`), notes below. "Full screen" is an expanded-layout
+toggle (a boolean flipping the stage between its bounded box and
+`fixed inset-0`) — never the browser Fullscreen API; Escape backs out of
+it the same way any other overlay on this site does.
+
+A small "← <Category name>" line above the title links back to that
+category's `/c/:slug`, the same left-justified treatment `/c/:slug` gives
+its own "← All Categories" line.
 
 The metadata block beneath the visual carries what you specified: how it was
-generated (`attribution`), when (`created_on`), why (`context` + `course`), and
-external links (`resources`). Notes render as Markdown with inline LaTeX.
+generated (`attribution`), when (`created_on`), why (`context` + `course`),
+its tags, and external links (`resources`, opened in a new tab). Notes
+render as Markdown with inline LaTeX (`MarkdownBody` — `react-markdown` +
+`remark-math` + `rehype-katex`, styled by `@tailwindcss/typography`'s
+`prose` classes, `prose-invert` applied from the page's own `theme` value
+rather than Tailwind's `dark:` variant, for the same reason `displayColor`
+does — see CLAUDE.md's dark-mode note).
 
 A visual whose `theme_affinity` is not `adaptive` gets matted on its own panel
+(a literal hex matching `tokens.css`'s paper/dark values, not the page's own
+CSS variable — the whole point is that it looks the same either way)
 rather than clashing with the page background.
+
+### `/inspo`
+
+A Pinterest board of sample visualizations, embedded with Pinterest's own
+`pinit.js` widget script rather than an iframe (Pinterest doesn't offer a
+sandboxed embed for boards) — first-party curated content the site owner
+points at, not pasted third-party code, so CLAUDE.md's code-bearing-kind
+sandbox rule doesn't apply. The board URL comes from `VITE_PINTEREST_BOARD_URL`
+(`frontend/.env`, documented in `frontend/.env.example`) — never a
+hardcoded/guessed URL; unset, the page shows a plain "not configured yet"
+message instead of a broken embed.
 
 ### ConceptForm
 
@@ -369,9 +402,12 @@ src/
                 (categories.ts's fetchCategoryDetail and visuals.ts's
                 fetchVisualsByCategory share one DTO->domain mapping,
                 toVisualCard, exported from visuals.ts)
-  domain/       Visual, Category, Tag — types and logic on them (Category
-                also exports HOME_CATEGORY, a local, never-fetched stand-in
-                for "no category selected"; LoadState.ts is the
+  domain/       Visual (also Resource, VisualDetail — the full /v/:slug
+                shape, a separate class from VisualCard rather than a
+                superset, since the two pages that use them genuinely want
+                different shapes), Category, Tag — types and logic on them
+                (Category also exports HOME_CATEGORY, a local, never-fetched
+                stand-in for "no category selected"; LoadState.ts is the
                 {loading|ready|error} shape every page's own fetches use).
                 categoryArt.ts generates each category's ASCII emblem;
                 seededRandom.ts is the small deterministic PRNG it (and
@@ -381,12 +417,16 @@ src/
                 (docs/DECISIONS.md); the backend model and endpoint
                 are untouched, just not called from here any more.
   hooks/        small hooks shared across components (useIsDesktopWidth)
-  renderers/    one file per kind; the registry mapping kind → renderer
+  renderers/    svg.tsx, svgDataUri.ts (the shared data-URI helper —
+                VisualPreviewCard's own thumbnail uses it too), image.tsx,
+                sandboxedIframe.tsx (d3/html/p5, one file since they share
+                the same sandboxed-iframe mechanism), and registry.tsx
+                (VisualRenderer, the one place that switches on `kind`)
   components/   ConceptForm, CategorySpinner, CategoryTreeNav, CategoryBubbleChart,
                 CategoryAsciiArt, VisualPreviewCard, ExpandCell, SiteHeader,
                 SiteFooter, MarkdownBody
   pages/        one file per route, mostly composing the above (Home,
-                CategoriesPage, CategoryPage)
+                CategoriesPage, CategoryPage, VisualPage, InspoPage)
   theme/        tokens, subway palette, dark mode, categoryColor (dark-mode
                 lightening of category colors for text)
 ```
@@ -395,7 +435,8 @@ src/
 once `/c/:slug` gave the "no router yet" decision (`docs/DECISIONS.md`) an
 actual second page to route to, not before.
 
-Markdown and LaTeX: `react-markdown` + `remark-math` + `rehype-katex`. Notes are
+Markdown and LaTeX: `react-markdown` + `remark-math` + `rehype-katex`, styled
+by `@tailwindcss/typography`. Notes are
 stored as raw Markdown so the rendering pipeline can change without a data
 migration.
 

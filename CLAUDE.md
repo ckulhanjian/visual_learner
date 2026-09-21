@@ -18,8 +18,8 @@ submit is visible until it is reviewed.
 | | |
 |---|---|
 | Backend | Flask + SQLAlchemy + Marshmallow, SQLite. |
-| Frontend | React + TypeScript + Vite + Tailwind v4. `react-router-dom` for the three routes that exist: `/` (spinner, theme, layout), `/categories` (every category as an embedded bubble chart), and `/c/:slug` (a category's full visual list) — the other two routes aren't built. Plain HTML/JS test page (`frontend-test/`) still around for raw API poking. |
-| Deferred | Vega-Lite and the `/create` editor page, p5.js, Postgres, Alembic. |
+| Frontend | React + TypeScript + Vite + Tailwind v4. `react-router-dom` for the five routes that exist: `/` (spinner, theme, layout), `/categories` (every category as an embedded bubble chart), `/c/:slug` (a category's full visual list), `/v/:slug` (one visual, full template), and `/inspo` (a Pinterest board embed) — `/submit` and `/create` aren't built. Plain HTML/JS test page (`frontend-test/`) still around for raw API poking. |
+| Deferred | Vega-Lite and the `/create` editor page, p5.js, Chart.js/vega renderers, Postgres, Alembic. |
 
 ## Commands
 
@@ -116,11 +116,16 @@ Do not weaken these without an explicit decision recorded in `docs/DECISIONS.md`
   clustered inside a bounded frame but never touching or overlapping, at
   rest, on hover, or while gently floating (see below). The spinner never
   navigates by itself — "See more" on the home page's preview grid is its
-  one link into a category's full page (`/c/:slug`). A category page has
-  no separate "back" link; the header logo itself carries you home,
-  landing the spinner on that same category rather than the unselected
-  state — see below. While a category page is open, the header link reads
-  "Category: <name>" instead of "Categories."
+  one link into a category's full page (`/c/:slug`), and each visual card
+  in that grid (or a category page's own grid) links to that visual's own
+  page (`/v/:slug`). The header logo itself carries you from a category or
+  visual page back home, landing the spinner on that category rather than
+  the unselected state; a category page's own small "← All Categories"
+  line (above its title, left-justified with it) is a separate link, to
+  `/categories` instead. While a category page is open, the header link
+  reads "Category: <name>" instead of "Categories." A third header link,
+  "Inspo," goes to a Pinterest board embed (`/inspo`) — see
+  `docs/DECISIONS.md`.
 - **The logo is set in the same italic EB Garamond as the hero title**, not
   the mono/uppercase treatment other header chrome uses — it reads as part
   of the page's voice, not as UI. Clicking it is context-dependent: from a
@@ -131,8 +136,8 @@ Do not weaken these without an explicit decision recorded in `docs/DECISIONS.md`
   `CategoryAsciiArt`) — concentric, noise-perturbed rings of density
   characters, seeded off the category's slug so it's stable across
   reloads, no two categories drawing the same pattern by construction. Shown
-  low-opacity behind the home page's hero title (floating) and behind a
-  category page's own title (pulsing) — decorative only, `aria-hidden`.
+  low-opacity, pulsing, behind a category page's own title only — not on
+  the home page, which shows none at all (see `docs/DECISIONS.md`).
 - **"Full screen"** means an expanded-layout toggle, never the browser Fullscreen
   API — it behaves inconsistently and traps keyboard handling.
 

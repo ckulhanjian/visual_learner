@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { fetchCategoryDetail, type CategoryDetail } from '../api/categories'
 import { ApiError } from '../api/client'
 import { CategoryAsciiArt } from '../components/CategoryAsciiArt'
@@ -71,6 +71,18 @@ function CategoryPageContent({ slug }: CategoryPageContentProps) {
               >
                 <CategoryAsciiArt category={state.data.category} theme={theme} animation="pulse" />
               </div>
+              {/* Distinct from the header logo's own "go home, carrying
+                  this category" behavior (docs/DECISIONS.md) — this goes
+                  to the bubble-chart overview instead, for a visitor who
+                  wants to pick a different category outright rather than
+                  return to the spinner. Left-justified with the title
+                  below it, not centered like the rest of the page. */}
+              <Link
+                to="/categories"
+                className="text-ink-muted hover:text-ink block font-mono text-[11px] tracking-wide uppercase transition-colors"
+              >
+                &larr; All Categories
+              </Link>
               <h1
                 className="font-body text-3xl italic md:text-4xl"
                 style={{ color: displayColor(state.data.category.color, theme) }}

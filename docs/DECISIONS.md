@@ -815,6 +815,147 @@ takes an optional `onLogoClick`, which only `Home.tsx` supplies
 `preventDefault` instead of letting the `Link` navigate. Every other page
 leaves `onLogoClick` unset and gets ordinary `Link` behavior.
 
+**The ASCII emblem came off the home page entirely, one round later.**
+Feedback: "on home page, home category should have no logo" followed
+immediately by "on home page, remove all logos. keep them on individual
+category pages" — the second, broader statement is what's implemented:
+`Home.tsx` no longer imports `CategoryAsciiArt` at all, for `HOME_CATEGORY`
+or any real category. It stays exactly as it was on `/c/:slug`. ("Logo"
+here means the per-category ASCII emblem, not the header's actual "Achk"
+logo — the site logo doesn't vary by category, so "keep them on individual
+category pages" wouldn't have made sense read that way; the emblem is the
+thing that's inherently per-category.)
+
+**The preview grid's per-card stagger came out too.** Feedback: "make all
+3 grids appear up at the same time, not different left to right." The
+`nth-child` delays in `.animate-fade-in-up-stagger` (0/60/120/180ms) were
+exactly that left-to-right cascade — removed, and the class renamed to
+`.animate-fade-in-up-group` since it no longer staggers anything. Every
+direct child now shares the same 420ms entrance, all at once.
+
+### `/c/:slug` gets its own small back-link
+
+Distinct from the logo's job above: "on each category page, above the
+title create a very small text line that says '← All Categories'... left
+justified with title and link to all categories page." This isn't a
+returning "← Home" link (that one's gone for good, replaced by the logo)
+— it's a new, smaller, differently-targeted one, going to `/categories`
+(the bubble chart) rather than back to the spinner. The two don't
+duplicate each other: the logo is for "I came from a specific category and
+want to go back to it," this line is for "show me every category so I can
+pick a different one." Placed inside the same `max-w-xl` block as the
+title so its left edge lines up with the title's, not centered like the
+page's error states are.
+
+### `/v/:slug` is built
+
+The template asked for outright — until now `/v/:slug` was documented
+(§6) but not implemented, the last of the originally-specified five routes
+still missing. Building it required finishing several things that were
+themselves still just documentation:
+
+**The renderer registry finally exists.** `src/renderers/` had never been
+created — `VisualPreviewCard` had its own inline `toSvgDataUri` with a
+`TODO: move this alongside the real svg renderer once src/renderers/
+exists`. It exists now: `svgDataUri.ts` holds that helper (a separate file
+from `svg.tsx`'s `SvgRenderer` component, since a file mixing a component
+export with a plain function export breaks Fast Refresh — oxlint's
+`only-export-components` rule caught this), `image.tsx` renders an
+image-kind visual's `asset_path` directly, `sandboxedIframe.tsx` covers
+`d3`/`html`/`p5` (one file, since all three share the same sandboxing
+mechanism — see below), and `registry.tsx` exports the one `VisualRenderer`
+component that switches on `kind`. `VisualPreviewCard` was updated to
+import the shared `toSvgDataUri` instead of keeping its own copy.
+
+**`chartjs` and `vega` render as an honest placeholder, not a blank box or
+a rushed integration.** Neither library is wired into the frontend yet —
+that's real, separate work (installing Chart.js, building a config-driven
+renderer; Vega is still deferred per CLAUDE.md). Rather than block the
+whole page template on that, `VisualRenderer` falls through to a small
+"kind — renderer not built yet" panel for those two kinds. `svg` and
+`image` are genuinely functional today (and cover every visual currently
+seeded); `d3`/`html`/`p5` are genuinely functional too, sandboxed —
+see below.
+
+**`d3`/`html`/`p5` render via a CDN script inside the sandboxed iframe,
+not a bundled npm dependency.** `html`-kind `source` is already a full
+document, so it becomes the iframe's `srcDoc` directly. `d3`/`p5` sources
+are a bare script assuming the library is already loaded, so
+`sandboxedIframe.tsx` prepends a `<script src="https://cdn.jsdelivr.net/...">`
+tag for the right one ahead of the pasted source, all inside one
+`srcDoc` document. This keeps the sandboxing property CLAUDE.md's security
+invariant requires (`sandbox="allow-scripts"`, never `allow-same-origin`)
+without adding D3 or p5 to *our own* bundle — they load inside the opaque
+iframe origin, isolated from the host page either way, so there's no
+lazy-import story needed for them the way §2 originally planned for an
+in-page Chart.js.
+
+**Markdown + LaTeX is wired in for real** — `react-markdown` +
+`remark-math` + `rehype-katex` (all newly installed) plus
+`@tailwindcss/typography` for the prose styling, exactly the stack
+`docs/ARCHITECTURE.md` had already committed to before either existed in
+`package.json`. `MarkdownBody` takes `theme` as a prop and applies
+`prose-invert` from its value rather than Tailwind's `dark:prose-invert` —
+the same rule every other theme-conditional style in this app follows,
+for the same reason (`data-theme` is a manual attribute, not
+`prefers-color-scheme`).
+
+**"Full screen" is one boolean and one class flip**, exactly as
+`docs/ARCHITECTURE.md` already specified: `expanded` toggles the stage
+`<div>` between a bounded `aspect-video` box in normal flow and
+`fixed inset-0`. Escape exits it (a `keydown` listener added only while
+expanded, same pattern `CategoryTreeNav`'s old click-outside-to-close used),
+and body scroll is locked meanwhile so the page underneath doesn't scroll
+along with it.
+
+**A non-adaptive `theme_affinity` mats the visual in a literal hex, not
+the page's own CSS variable.** `LIGHT_MAT`/`DARK_MAT` in `VisualPage.tsx`
+duplicate `tokens.css`'s `--color-paper` values on purpose — the whole
+point of matting is that a dark-designed visual looks the same regardless
+of whether the visitor has the *page* set to light or dark, so it can't
+read the page's current variable. Kept in sync by hand; there's only one
+other place these two hexes are declared.
+
+**`VisualPreviewCard` links to `/v/:slug` now — a real `Link`, not a
+disabled stub, and the /v/:slug page's existence is why.** Same pattern
+`/c/:slug` and `ExpandCell` went through when their destinations were
+built. The `Link` wraps the card's content with `className="contents"`
+rather than replacing the `<li>` — `display: contents` makes the `Link`
+itself transparent to the grid/flex layout, so the `<li>`'s existing hover
+scale/shadow effects (which target the `<li>` and its `group-hover`
+descendants) keep working exactly as before; the visible content is still
+directly the `<li>`'s children, just wrapped in something clickable.
+
+**`/uploads` was added to the Vite dev proxy.** `asset_path` for an
+image-kind visual is already a full path (`/uploads/<name>`, from
+`UploadService.save`), meant to work once frontend and backend share an
+origin in production — but Vite's dev server only proxied `/api`, so an
+`<img src="/uploads/...">` 404'd locally. One more proxy entry, same
+shape as the existing one, fixes local preview without changing what the
+path itself is.
+
+### `/inspo` — a Pinterest board, not a guessed URL
+
+"Lets make another tab up top... of inspo / embed pinterest board for
+sample visualizations." No actual board URL was given, and CLAUDE.md's own
+standing rule (never generate or guess a URL) rules out inventing one —
+so the page and the header tab are built regardless, reading the board URL
+from `VITE_PINTEREST_BOARD_URL` (`frontend/.env`, documented in a new
+`frontend/.env.example` — the frontend didn't have one of these before).
+Unset, `/inspo` shows a plain "not configured yet, set this var" message
+instead of a broken or empty embed. Embedded via Pinterest's own
+`pinit.js` widget script (an `<a data-pin-do="embedBoard" ...>` it scans
+for and replaces) rather than an iframe, since Pinterest doesn't offer a
+sandboxed embed option for a whole board — acceptable here specifically
+because this is first-party content the site owner points at, not pasted
+third-party code; CLAUDE.md's sandbox rule is about the latter.
+`usePinterestWidget` adds the script tag once (checking for an existing
+`<script src>` first) and, if it's already loaded from an earlier visit,
+calls Pinterest's own `PinUtils.build()` to make it re-scan the DOM — its
+script only auto-scans once, on its own load, so arriving at `/inspo` by
+client-side navigation after an earlier page view already loaded it would
+otherwise leave the embed anchor as plain unbuilt text.
+
 ---
 
 ## 2. Visualization libraries
@@ -856,6 +997,16 @@ file and one registry line — nothing already working changes.
 Approximate gzipped weights, to be verified before committing:
 plain 0 · Chart.js ~60 KB · D3 ~90 KB · Observable Plot ~150 KB · p5 ~250 KB ·
 Vega stack ~350 KB. Lazy loading matters more than any of these numbers.
+
+**Revised once `/v/:slug` was actually built (§1):** `d3` and `p5` ended up
+loaded from a CDN *inside* the sandboxed iframe (`renderers/sandboxedIframe.tsx`),
+not as a lazy npm import into our own bundle — the sandbox already isolates
+them from the host page, so there's nothing for our bundle size to gain by
+also owning the dependency, and the iframe needs the library present
+regardless of what we import. The "lazy-loaded npm dependency" plan below
+still applies to `chartjs` (in-page, no sandbox, genuinely adds to our
+bundle) once it's built; it just turned out not to apply to the two
+kinds that render sandboxed.
 
 ### Sandboxing
 
