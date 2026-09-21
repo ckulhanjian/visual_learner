@@ -11,7 +11,7 @@ Three layers.
 
 ```
 React (TypeScript, Vite, Tailwind v4)        :5173
-  pages/        five routes, compose only
+  pages/        five routes, compose only (two built: Home, CategoryPage)
   components/   ConceptForm, CategorySpinner, CategoryTreeNav, VisualPreviewCard, MarkdownBody
   renderers/    one file per kind + the registry
   domain/       Visual, Category, Tag, Topic types
@@ -245,7 +245,7 @@ instead of forcing one into multipart encoding it does not need.
 | route | shows | data |
 |---|---|---|
 | `/` | category spinner + top-3 preview of the active category, subway-colored | `GET /categories`, `GET /visuals?category=...` |
-| `/c/:slug` | *not built yet* — 3-column grid of visual cards | `GET /categories/:slug` |
+| `/c/:slug` | category name + blurb, 3-column grid of every published visual | `GET /categories/:slug` |
 | `/v/:slug` | full-bleed visual, expand toggle, metadata and notes below | `GET /visuals/:slug` |
 | `/submit` | ConceptForm + upload or paste | `GET /categories`, `GET /tags`, `GET /meta`, `POST /visuals` |
 | `/create` | *deferred with Vega* — editor, live preview, same ConceptForm | as submit |
@@ -278,13 +278,25 @@ centered alone while `HOME_CATEGORY` is active, pinned near the top with the
 grid appearing below it once the spinner moves off slot 0 — animated between
 them with a `transform`, not a layout change. Whichever category is centered
 in the spinner drives the 4-column preview grid (`w-full` of that left
-column, centered with the hero above it) of that category's most recent
-three published visuals plus a stubbed `ExpandCell` as the 4th slot —
-`/c/:slug` doesn't exist yet, so it's disabled rather than a dead link. No
-separate heading names the active category above the grid; the spinner and
-tree nav already show that.
+column, shifted right of the hero above it) of that category's most recent
+three published visuals plus an `ExpandCell` as the 4th slot, linking to
+`/c/:slug`. No separate heading names the active category above the grid;
+the spinner and tree nav already show that.
 
-The footer carries a copyright line and a link to the repo.
+The footer carries a copyright line and a link to the repo. `SiteHeader`
+(logo linking home, `CategoryTreeNav`, theme toggle) is shared with every
+other page rather than each one implementing its own copy.
+
+### `/c/:slug`
+
+`GET /categories/:slug` in one request: category metadata (name, subway
+color, blurb) and every one of its published visuals, already the shape
+this page needs — no separate call to trim down from the home page's
+top-3 preview. A slug with no matching category (`not_found`, 404) renders
+as "Category not found," not a generic error; a category with zero
+published visuals renders its name and blurb with "No published visuals
+yet." instead of an empty grid. `VisualPreviewCard`, reused as-is from the
+home page's preview grid.
 
 ### `/v/:slug`
 
@@ -312,17 +324,26 @@ schema. Adding a field later means editing one file and it appears in both place
 ```
 src/
   api/          one module per endpoint group; only place fetch appears
+                (categories.ts's fetchCategoryDetail and visuals.ts's
+                fetchVisualsByCategory share one DTO->domain mapping,
+                toVisualCard, exported from visuals.ts)
   domain/       Visual, Category, Tag, Topic — types and logic on them
                 (Category also exports HOME_CATEGORY, a local, never-fetched
-                stand-in for "no category selected")
+                stand-in for "no category selected"; LoadState.ts is the
+                {loading|ready|error} shape every page's own fetches use)
   hooks/        small hooks shared across components (useIsDesktopWidth)
   renderers/    one file per kind; the registry mapping kind → renderer
   components/   ConceptForm, CategorySpinner, CategoryTreeNav, VisualPreviewCard,
-                ExpandCell, SiteFooter, MarkdownBody
-  pages/        one file per route, mostly composing the above
+                ExpandCell, SiteHeader, SiteFooter, MarkdownBody
+  pages/        one file per route, mostly composing the above (Home,
+                CategoryPage)
   theme/        tokens, subway palette, dark mode, categoryColor (dark-mode
                 lightening of category colors for text)
 ```
+
+`App.tsx` holds the `react-router-dom` `<BrowserRouter>`/`<Routes>` — added
+once `/c/:slug` gave the "no router yet" decision (`docs/DECISIONS.md`) an
+actual second page to route to, not before.
 
 Markdown and LaTeX: `react-markdown` + `remark-math` + `rehype-katex`. Notes are
 stored as raw Markdown so the rendering pipeline can change without a data

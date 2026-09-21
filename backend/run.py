@@ -12,6 +12,15 @@ def main():
     if command == "serve":
         with app.app_context():
             db.create_all()
+            # Outside production only: run_seed() is per-category
+            # get-or-create, so this is additive and idempotent, not a
+            # reset. It exists because seed.py has repeatedly gained
+            # categories that a dev database seeded before that point
+            # never picks up without a separate, easy-to-forget `python
+            # run.py seed` — see docs/DECISIONS.md. Never in production:
+            # a live database is not a demo to keep topped up.
+            if app.config.get("ATLAS_ENV") != "production":
+                run_seed()
         app.run(port=5001, debug=app.config.get("DEBUG", False))
     elif command == "seed":
         with app.app_context():

@@ -1,15 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { fetchCategories } from '../api/categories'
-import { fetchCategoryTopics } from '../api/topics'
 import { fetchVisualsByCategory } from '../api/visuals'
 import { CategorySpinner } from '../components/CategorySpinner'
-import { CategoryTreeNav } from '../components/CategoryTreeNav'
 import { ExpandCell } from '../components/ExpandCell'
 import { SiteFooter } from '../components/SiteFooter'
-import { ThemeToggle } from '../components/ThemeToggle'
+import { SiteHeader } from '../components/SiteHeader'
 import { VisualPreviewCard } from '../components/VisualPreviewCard'
 import { HOME_CATEGORY, type Category } from '../domain/Category'
-import type { CategoryTopics } from '../domain/Topic'
+import type { LoadState } from '../domain/LoadState'
 import type { VisualCard } from '../domain/Visual'
 import { useIsDesktopWidth } from '../hooks/useIsDesktopWidth'
 import { useTheme } from '../theme/useTheme'
@@ -21,15 +19,9 @@ const PREVIEW_COUNT = 3
 // than tuned separately for each.
 const VERTICAL_NUDGE_FRACTION = 0.1
 
-type LoadState<T> =
-  | { status: 'loading' }
-  | { status: 'ready'; data: T }
-  | { status: 'error'; message: string }
-
 export function Home() {
   const { theme, toggleTheme } = useTheme()
   const [categoriesState, setCategoriesState] = useState<LoadState<Category[]>>({ status: 'loading' })
-  const [topicsState, setTopicsState] = useState<LoadState<CategoryTopics[]>>({ status: 'loading' })
   const [activeCategory, setActiveCategoryState] = useState<Category>(HOME_CATEGORY)
   const [previewState, setPreviewState] = useState<LoadState<VisualCard[]>>({ status: 'loading' })
   const isHome = activeCategory.slug === HOME_CATEGORY.slug
@@ -60,22 +52,6 @@ export function Home() {
         if (cancelled) return
         const message = error instanceof Error ? error.message : 'Unknown error'
         setCategoriesState({ status: 'error', message })
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    fetchCategoryTopics()
-      .then((topics) => {
-        if (!cancelled) setTopicsState({ status: 'ready', data: topics })
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return
-        const message = error instanceof Error ? error.message : 'Unknown error'
-        setTopicsState({ status: 'error', message })
       })
     return () => {
       cancelled = true
@@ -138,13 +114,7 @@ export function Home() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-line flex items-center justify-between border-b px-6 py-5">
-        <div className="flex items-center gap-4">
-          <span className="font-mono text-sm tracking-[0.2em] uppercase">Atlas</span>
-          {topicsState.status === 'ready' && <CategoryTreeNav data={topicsState.data} />}
-        </div>
-        <ThemeToggle theme={theme} onToggle={toggleTheme} />
-      </header>
+      <SiteHeader theme={theme} onToggleTheme={toggleTheme} />
 
       <main ref={mainRef} className="flex flex-1 flex-col gap-10 px-6 py-16 lg:flex-row lg:gap-6">
         <div className="flex flex-1 flex-col gap-10">
@@ -200,7 +170,7 @@ export function Home() {
                         </li>
                       ),
                     )}
-                    <ExpandCell categoryColor={activeCategory.color} />
+                    <ExpandCell categorySlug={activeCategory.slug} categoryColor={activeCategory.color} />
                   </ul>
                 )}
               </div>

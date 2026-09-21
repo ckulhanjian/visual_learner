@@ -74,12 +74,15 @@ Self-hosted via `@fontsource`, latin-only subsets — pulling the default
 `400.css` etc. drags in cyrillic/greek/vietnamese subsets nothing here needs
 and roughly quadruples the CSS payload for no visible difference.
 
-### No router yet
+### Router added with the second page, not before it
 
-`react-router-dom` isn't installed. `src/App.tsx` renders `Home` directly.
-Adding a router before a second page exists to route to is exactly the kind
-of premature abstraction this repo's conventions warn against; it goes in
-when `/c/:slug` (or another route from §6) is actually built.
+`react-router-dom` wasn't installed while `Home` was the only page —
+adding a router before a second page exists to route to would have been
+exactly the kind of premature abstraction this repo's conventions warn
+against. `/c/:slug` (§6) is that second page, so `App.tsx` now holds a
+`<BrowserRouter>`/`<Routes>` pairing `/` and `/c/:slug` to `Home` and
+`CategoryPage`. Nothing else in the decision changes: a third page still
+just adds a third `<Route>`, not a rethink.
 
 ### Category nav: spinner + tree, not the horizontal arc
 
@@ -255,6 +258,20 @@ a from-scratch `python run.py seed`) picks them up automatically; a
 dev database seeded before this change needs one `python run.py seed` run
 to catch up, and won't get there on its own.
 
+**`python run.py serve` now runs that same seed automatically, outside
+production.** The paragraph above was the answer the first three times a
+newly added category didn't show up somewhere — a real, reproducible
+database bug would have been fixed once, but "the fix is a command you
+have to remember to separately re-run every time seed.py changes" kept
+recreating the same report. `run_seed()` is per-category
+get-or-create — additive, idempotent, safe to call on every startup — so
+`serve` calls it right after `db.create_all()`, gated on
+`app.config["ATLAS_ENV"] != "production"`. That gate is the whole point:
+a live database is not a demo to keep topped up, and this must never
+silently write to one. Development and testing are exactly the
+environments where "always current with seed.py" is worth having and nothing
+is at risk if it's wrong.
+
 **The left column (from the page's left edge to the spinner's fixed-width
 column) is the page's whole "workspace," and everything in it centers or
 fills against that box, not the full viewport.** Originally the hero
@@ -351,15 +368,11 @@ real card's regardless of what else is in the row — mixed or not.
 `z-index` so it doesn't get covered by its grid neighbors) — the point is to
 make a genuinely tiny thumbnail (an SVG shrunk into a 1:1 box) briefly
 legible without needing a real lightbox or a second page. The title beneath
-it does the same job for text: instead of `truncate`'s ellipsis, the full
-title is always in the DOM and slides left on hover far enough to bring its
-clipped tail fully into view (`translateX(-overflowPx)`, `overflowPx =
-scrollWidth - clientWidth`, computed via `useLayoutEffect` since it depends
-on rendered width, not string length), then eases back to the start on
-mouse-leave. A title that already fits computes `overflowPx = 0` and simply
-never moves. Transition duration scales with distance
-(`overflowPx / 30` seconds, floored at 0.5s) so a long title and a short one
-read as the same scroll *speed* rather than the same duration.
+it briefly did the same job for text — the full title stayed in the DOM
+past `truncate`'s ellipsis and slid left on hover to bring its clipped tail
+into view — but feedback asked for that movement removed. Back to plain
+`truncate`: an ellipsis on overflow, static, no measurement or transition
+machinery to go with it.
 
 **The decorative spinner spiral is gone — removed outright, not replaced
 again.** It went through three versions across three rounds of feedback (a
@@ -379,6 +392,52 @@ at `RADIUS - 16 = 154`, so `right: 0` to `~60` is dead space at every
 rotation. Every earlier version's real bug was sitting somewhere else in
 the box instead — centered behind the dot and active label, the one spot
 guaranteed to always have something else on top of it.
+
+### `/c/:slug` is built
+
+The second page, per §6 — `ExpandCell`'s "See all visuals" is now a real
+`Link`, not a disabled stub, and the router decision above exists because
+of it.
+
+**One request, not two.** `GET /categories/:slug` already returns the
+category's own metadata *and* its full list of published visuals in a
+single payload (the route handler adds a hand-built `visuals` array to the
+`CategorySchema` dump — see `docs/ARCHITECTURE.md` §6) — exactly the shape
+this page needs, so `fetchCategoryDetail` hits that one endpoint rather
+than fetching the category and its visuals separately, or reusing the home
+page's `fetchVisualsByCategory` (which fetches visuals only, sized for a
+top-3 preview it does the slicing for). The DTO-to-domain mapping for a
+visual card is shared between the two API modules regardless
+(`toVisualCard`, exported from `api/visuals.ts`), so the two endpoints
+don't each carry their own copy of it.
+
+**A missing slug reads as "Category not found," not a generic error
+screen.** `CategoryService.get_by_slug` raises `NotFoundError`, which the
+API layer turns into a 404 with code `not_found` — the frontend checks
+`error instanceof ApiError && error.status === 404` specifically to choose
+that message over a bare error dump. A category with zero published
+visuals is a different, non-error case: its name and blurb still render,
+with "No published visuals yet." where the grid would go, not a 404 —
+having a category with nothing published is normal here, not exceptional
+(see the five newer categories, above).
+
+**`CategoryPageContent` is keyed by slug (`key={slug}`), not merely
+effect-dependent on it.** Navigating from one category page to another
+re-renders the same route, not a fresh mount, so without the key,
+`fetchCategoryDetail`'s effect would need to reset `state` back to
+`loading` itself mid-effect for the new slug — a working but awkward
+pattern (and one `oxlint`'s `set-state-in-effect` rule flags). Keying the
+content component by `slug` makes React remount it on every slug change
+instead, so each mount starts at `loading` once, for its own slug, without
+an explicit reset.
+
+**`SiteHeader` is shared, not duplicated.** Both pages need the same logo
+(now a real `Link` home, where it was inert text with only one page to
+link to), category tree dropdown, and theme toggle — extracted out of
+`Home.tsx` into its own component (with its own `topics` fetch, the only
+data it needs) rather than copied into `CategoryPage.tsx`. `LoadState<T>`
+moved to `domain/LoadState.ts` for the same reason: both pages' fetches use
+the identical `{loading | ready | error}` shape.
 
 ---
 
