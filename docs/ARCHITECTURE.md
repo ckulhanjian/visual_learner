@@ -257,21 +257,29 @@ Two nav surfaces, not one:
 
 - **`CategorySpinner`** — categories arranged on a true circle whose center
   sits off-screen at the right edge of its own fixed-width flex column
-  (vertically centered by that column, not by manual positioning), infinitely
+  (vertically centered by that column, not by manual positioning). Discrete,
+  not infinite: a local `HOME_CATEGORY` stand-in always occupies slot 0
+  ("nothing selected yet"), and scrolling is clamped at both ends rather than
   wrapping. Driven by wheel delta and arrow keys (not real page scroll — the
-  page itself doesn't move), with a dot marking whichever category is
-  centered, colored to match it, and a `FibonacciSpiral` drawing in behind
-  the labels as the spinner turns. Below `lg` (1024px) it's a plain
-  tap-to-select row instead. See `docs/DECISIONS.md` for the geometry, the
-  column layout, and why it isn't real scroll.
+  page itself doesn't move), with a dot marking whichever slot is centered,
+  colored to match it, the active label's font size growing to mark the
+  landing, a short `navigator.vibrate` on each step (a no-op where
+  unsupported), and a `Spiral` drawing in behind the labels as the run
+  progresses. Below `lg` (1024px) it's a plain tap-to-select row instead. See
+  `docs/DECISIONS.md` for the geometry, the column layout, and why it isn't
+  real scroll.
 - **`CategoryTreeNav`** — a Khan Academy–style two-column header dropdown
   (categories on the left, a scrollable topic list on the right), backed by
   `GET /topics`. Category → topic → sub-topic, as deep as the data goes.
 
-The page body is two flex columns at `lg`+: the hero text, blurb, and preview
-grid on the left (grows to fill the space, `max-w-3xl`), the spinner in its
-own fixed-width column on the right. Whichever category is centered in the
-spinner drives the 4-column preview grid of that category's most recent
+The page body is two flex columns at `lg`+: the hero text and (once a real
+category is active) the preview grid on the left, the spinner in its own
+fixed-width column on the right. The hero has two positions — vertically
+centered alone while `HOME_CATEGORY` is active, pinned near the top with the
+grid appearing below it once the spinner moves off slot 0 — animated between
+them with a `transform`, not a layout change. Whichever category is centered
+in the spinner drives the 4-column preview grid (`w-full` of that left
+column, centered with the hero above it) of that category's most recent
 three published visuals plus a stubbed `ExpandCell` as the 4th slot —
 `/c/:slug` doesn't exist yet, so it's disabled rather than a dead link. No
 separate heading names the active category above the grid; the spinner and
@@ -306,9 +314,12 @@ schema. Adding a field later means editing one file and it appears in both place
 src/
   api/          one module per endpoint group; only place fetch appears
   domain/       Visual, Category, Tag, Topic — types and logic on them
+                (Category also exports HOME_CATEGORY, a local, never-fetched
+                stand-in for "no category selected")
+  hooks/        small hooks shared across components (useIsDesktopWidth)
   renderers/    one file per kind; the registry mapping kind → renderer
   components/   ConceptForm, CategorySpinner, CategoryTreeNav, VisualPreviewCard,
-                ExpandCell, FibonacciSpiral, SiteFooter, MarkdownBody
+                ExpandCell, Spiral, SiteFooter, MarkdownBody
   pages/        one file per route, mostly composing the above
   theme/        tokens, subway palette, dark mode, categoryColor (dark-mode
                 lightening of category colors for text)

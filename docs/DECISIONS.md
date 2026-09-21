@@ -87,14 +87,35 @@ Superseded the first pass at `ArcNav` (a horizontal dome of category names)
 with two separate surfaces, after seeing a mockup of a vertical rotary
 picker:
 
-**`CategorySpinner`** (vertically centered on the right edge, home page only). Infinite wraparound —
-scrolling past the last category lands back on the first — which a real
-DOM scroll position can't do without cloning content or faking the scroll
-height. Instead it's driven by a virtual offset: a `wheel` listener
-(`preventDefault`, so the page itself never scrolls) and `ArrowUp`/`ArrowDown`
-both nudge a continuous value that's taken `mod categories.length`. The page
+**`CategorySpinner`** (vertically centered on the right edge, home page only).
+It's driven by a virtual offset, not a real DOM scroll position: a `wheel`
+listener (`preventDefault`, so the page itself never scrolls) and
+`ArrowUp`/`ArrowDown` both nudge a continuous `position` value. The page
 trades its native scroll for this on `/`, which is a deliberate tradeoff, not
 an oversight — the spinner *is* the page's primary interaction here.
+
+**Discrete, not infinite — `position` is clamped to `[0, slots.length - 1]`,
+not wrapped.** An earlier version wrapped `position mod categories.length` so
+scrolling past the last category landed back on the first, seamlessly (angles
+are periodic, so that needed no special-casing). Feedback asked for a real
+start and end instead, so `movePosition` now clamps with `Math.min`/`Math.max`
+rather than modulo — the spinner stops at both ends rather than looping.
+`MAX_VISIBLE_DIFF` exists because of that change: without wraparound bringing
+a far-off label back around, scrolling far enough would otherwise swing a
+label's angle past vertical and toward the *opposite* side of the circle, so
+labels more than a few steps from active simply stop rendering instead
+(matching how faded-out — near the opacity floor — they already were at that
+distance).
+
+**`slots` is `[HOME_CATEGORY, ...categories]`, not just the fetched
+categories.** `HOME_CATEGORY` (`domain/Category.ts`) is a local constant, not
+a row from the API — slug `'home'`, position `-1` — that always occupies slot
+0. It's what "discrete start" *is*: the run starts on it, not on the first
+real category, and Home.tsx renders it as "nothing selected yet" (see below)
+rather than as a category with an empty grid. Scrolling back to it from
+Physics is symmetric with scrolling to it from anywhere else — there's no
+separate "has the visitor ever scrolled" flag, just whichever slot `position`
+currently rounds to.
 
 Geometry: a true circle whose center sits off-screen at the container's right
 edge, so the selected category always sits at the circle's leftmost point and
@@ -104,10 +125,19 @@ in `CategorySpinner.tsx`), not `360 / count` — dividing the full circle
 evenly among as few as 4 categories would put immediate neighbors 90° from
 the selected item, i.e. fully vertical, unreadable text. "No duplicates"
 means exactly one point per category, not that they have to span the whole
-circle. Wraparound needs no special-casing here: angles are periodic, so
-rotating past a full lap is already seamless — unlike the earlier
-slot-based approach this replaced, which needed a fractional-offset trick to
-fake the same continuity.
+circle.
+
+**The active label grows (`text-2xl` → `text-3xl`) instead of just gaining
+opacity.** Landing on a category was otherwise signaled only by color and a
+faint size-independent brightening — a discrete size change reads as a much
+clearer "this one is selected" the instant `position` settles, with
+`transition-[font-size]` softening the jump rather than snapping it.
+
+**A short `navigator.vibrate(10)` fires whenever the committed index
+actually changes** (inside `commitIfChanged`, guarded with `?.` since it's
+unsupported on desktop browsers and iOS Safari — a silent no-op there, not an
+error). Deliberately short: long enough to read as a click-stop confirming
+the landing, not a buzz.
 
 **Layout: a real two-column flex row, not a `position: fixed` overlay with a
 JS-computed scale factor.** The first version made the spinner `fixed` in
@@ -239,11 +269,43 @@ within the page as a whole, which is what the workspace column actually is.
 Tiles get genuinely large on a wide screen as a direct consequence, which is
 the point, not a side effect to guard against.
 
-That grid also carries its own small `mt-6` and `pl-6`/`pl-10` (past `sm`)
-on top of the workspace's shared `gap-10` and the page's own padding —
-sitting flush against the hero's left edge and directly under its text
-read as cramped, so the grid gets a bit more breathing room on both axes
-without affecting the hero above it or the workspace's own bounds.
+A brief `mt-6 pl-6/pl-10` on the grid (nudging it down and right of the
+hero) turned out to be the wrong tool once centering the grid with the hero
+came up explicitly: one-sided padding shifts a `w-full` element's visible
+content off-center from its own box (the padding eats space on the left
+only), which is exactly what broke the earlier "the grid should read as
+centered under the hero" intent. Removed — see the two-position hero below,
+which handles "the grid sits lower" a different way, and plain `w-full`
+(no side padding) keeps the grid's center exactly matching the hero's,
+since both are centered/sized against the same box.
+
+**The hero has two positions, not one, and HOME_CATEGORY (see above) is
+what switches between them.** While it's the active slot — nothing "really"
+selected yet — the hero is the only thing in the workspace and sits
+vertically centered in it; the instant `position` moves to any real
+category, the hero snaps to a pinned position near the top and the grid
+appears below it. Both positions apply the same extra `VERTICAL_NUDGE_FRACTION`
+(10% of the available height) on top of their "natural" spot (dead center,
+dead top) — a flat "move it lower" applied identically rather than tuned
+per-position.
+
+Implemented as a `transform: translateY(...)` on a wrapper around the hero
+(and, when present, the grid) rather than switching `justify-content`
+between the two states: a flex alignment change can't be transitioned by
+CSS, but a `transform` can, so this is what makes "the title and text move
+into their spot" an actual animation instead of a jump cut. The offset is
+computed against `main`'s own content-box height (`clientHeight` minus its
+own padding, read via `getComputedStyle`) — not the workspace column's own
+`clientHeight`, which is unreliable here: `align-items` computes to `normal`
+in this stack (Tailwind's preflight doesn't force `stretch`), so a flex-row
+child with `h-full` doesn't actually inherit the row's cross size. Desktop
+only (`useIsDesktopWidth`, shared now — see `hooks/useIsDesktopWidth.ts`):
+a `transform` repaints without reserving layout space, which is invisible
+at `lg` (the spinner lives in its own separate flex-row column, indifferent
+to this content's height) but caused a real bug below it — `CategorySpinner`'s
+mobile tap-row sits directly after this column in normal document flow, so
+shifting the grid down without reserving that space visually overlapped it.
+Below `lg` the offset is just always 0.
 
 **The top-3 preview is a 4-column grid** (2 columns below `sm`), not a
 vertical list — visual cards fill the first slots, an `ExpandCell` is always
@@ -251,8 +313,17 @@ the last one. No separate category-name heading above the grid either: the
 spinner and tree nav already say which category is active, so repeating it
 there was redundant. `ExpandCell` reads "See all visuals," not "+ Expand" —
 no border, no icon, deliberately lighter-weight than the cards so it doesn't
-compete with them. It's disabled rather than a dead link — `/c/:slug` isn't
-built, so there's nowhere for it to go yet. No router either, per above.
+compete with them, and it italicizes on hover rather than gaining a border
+or background, for the same reason. It's disabled rather than a dead link —
+`/c/:slug` isn't built, so there's nowhere for it to go yet. No router
+either, per above.
+
+`ExpandCell` dropped `aspect-square` in favor of `flex flex-col justify-end`
+— a visual card's own `<li>` is taller than a bare square (image plus its
+title/summary text below), and CSS grid's default `align-items: stretch`
+already sizes every cell in the row to match the tallest one, so the fix
+for "line the text up with the bottom of the cards" was bottom-aligning
+this cell's own content, not fighting the grid for height.
 
 `VisualPreviewCard` scales up on hover (with a shadow and a higher
 `z-index` so it doesn't get covered by its grid neighbors) — the point is to
@@ -268,47 +339,45 @@ never moves. Transition duration scales with distance
 (`overflowPx / 30` seconds, floored at 0.5s) so a long title and a short one
 read as the same scroll *speed* rather than the same duration.
 
-**`FibonacciSpiral`** (`components/FibonacciSpiral.tsx`) draws behind the
-spinner's labels, tinted to the active category's color. It fills in
-progressively as the spinner turns and resets to undrawn the instant it
-wraps back to the first category — both for free, by reusing the spinner's
-own continuous, wrapping `position` rather than tracking separate state:
-`progress = (position mod count) / count` is 0 exactly when `position` is a
-multiple of `count` (the first category), so the "restart" isn't a special
-case, it's what that formula already does. The underlying curve is a
-standard Fibonacci-squares construction (fixed at 8 terms regardless of
-category count — more terms just makes for a bigger sprawling shape, not a
-more correct one).
+**`Spiral`** (`components/Spiral.tsx`) draws behind the spinner's labels,
+tinted to the active category's color, filling in as `position` advances
+through the discrete run: `progress = position / (slots.length - 1)`, 0 at
+`HOME_CATEGORY` and reaching 1 at the last real category. Unlike the old
+wraparound spinner this never resets on its own — there's no lap to
+complete, so it reads as a progress indicator for the run rather than an
+animation that loops.
 
-It briefly rendered as a grid of small squares along that curve instead of
-a smooth stroke — feedback on the first version (a thin anti-aliased
-`<path>`) asked for a pixel/ascii-art read, blocky steps rather than a
-vector line — but a later round asked for "a circle spiral, not pixel
-dots," reversing that. It's back to the original: one continuous `<path>`
-along the arcs, `pathLength="1"` with `stroke-dashoffset` revealing it
-proportionally, no rasterization step. The rasterizer
-(`computePixelPath`, a detached `<path>` walked with `getPointAtLength`
-and bucketed into grid cells) is gone with it rather than kept dead in the
-file — nothing else used it.
+It went through two earlier versions this replaced outright, not
+incrementally patched, each superseded by later feedback rather than kept
+around behind a flag:
 
-The Fibonacci-squares construction itself grows wider than tall (each
-successive square approaches the golden ratio versus the accumulated
-rectangle, ~1.6:1) — it reads as horizontal by default. Feedback wanted it
-vertical, and rotating the whole rendered `<svg>` 90° (a CSS `transform`,
-not a change to the square/path math) does that: the container it lives in
-is a square (`SPIRAL_SIZE` × `SPIRAL_SIZE`), so rotating in place doesn't
-shift or resize anything else.
+1. A **Fibonacci-squares construction** (quarter-circle arcs chained
+   through squares sized by the Fibonacci sequence) — abandoned once
+   feedback asked for "just...a spiral," not a golden-ratio shape tied to
+   a specific mathematical sequence.
+2. A **pixel/ascii-art rasterization** of that curve (`computePixelPath`, a
+   detached `<path>` walked with `getPointAtLength` and bucketed into grid
+   cells, rendered as small `<rect>`s) — abandoned once feedback asked for
+   "a circle spiral, not pixel dots," reversing the earlier ask for a
+   blocky read.
+
+`Spiral` is neither: a plain **Archimedean spiral** (radius grows linearly
+with angle, `r = t * MAX_RADIUS`, `θ = t * TURNS * 2π`), matching a
+hand-drawn reference image of concentric loops. No SVG primitive expresses
+that curve directly (arcs are circular, not spiral), so it's a dense
+polyline — enough samples (140, ~2.75 turns) that individual segments don't
+read as facets at the size it's rendered — revealed with the same
+`pathLength="1"` + `stroke-dashoffset` technique as its predecessors, since
+that part of the mechanism was never the problem.
 
 **Tucked into the one strip of the listbox no label or the dot ever
 reaches**, not centered behind them. Every rendered label's `right` offset
 (`LABEL_GAP` + `RADIUS * cos(angle)` across the visible diffs) falls in
 roughly `[63.5, 204]`, and the dot sits at `RADIUS - 16 = 154` — so
-`right: 0` to `~60` is dead space at every rotation, not just the one the
-first version was screenshotted at. Shrinking `SPIRAL_SIZE` (200 → 56) to
-fit inside that strip and moving it there (`right-10` → `right-1`) fixed a
-real overlap: the original size and position put it directly behind the
-dot and the active label, the one spot guaranteed to always have something
-else on top of it.
+`right: 0` to `~60` is dead space at every rotation. `SPIRAL_SIZE` (56)
+and its position (`right-1`) fit inside that strip — an earlier, much
+larger version sat centered behind the dot and active label instead, the
+one spot guaranteed to always have something else on top of it.
 
 ---
 

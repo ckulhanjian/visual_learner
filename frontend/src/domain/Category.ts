@@ -33,3 +33,18 @@ export class Category {
     return [...categories].sort((a, b) => a.position - b.position)
   }
 }
+
+// A local, never-fetched stand-in for "no category selected yet" — the
+// spinner's first, discrete stop, matching no real backend row (id -1,
+// position -1). Compared by slug ('home'), not identity, since it crosses
+// a prop boundary (CategorySpinner -> Home). See docs/DECISIONS.md on the
+// two-position hero layout this drives.
+export const HOME_CATEGORY = new Category({
+  id: -1,
+  slug: 'home',
+  name: 'Home',
+  color: '#8f887a',
+  blurb: '',
+  position: -1,
+  publishedCount: 0,
+})

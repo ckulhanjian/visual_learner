@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Category } from '../domain/Category'
+import { HOME_CATEGORY } from '../domain/Category'
+import { useIsDesktopWidth } from '../hooks/useIsDesktopWidth'
 import { displayColor } from '../theme/categoryColor'
 import { useTheme } from '../theme/useTheme'
-import { FibonacciSpiral } from './FibonacciSpiral'
+import { Spiral } from './Spiral'
 
 interface CategorySpinnerProps {
   categories: Category[]
@@ -42,51 +44,41 @@ const SPIRAL_SIZE = 56
 // between them, instead of the label's edge sitting right up against it.
 const LABEL_GAP = 34
 const WHEEL_SENSITIVITY = 0.0032 // wheel deltaY px -> fraction of a step
-const DESKTOP_QUERY = '(min-width: 1024px)' // Tailwind's lg — matches Home.tsx's column breakpoint
 const DEG_TO_RAD = Math.PI / 180
 // Degrees of arc between adjacent categories. Fixed, not 360/count: with as
 // few as 4 categories, dividing the full circle evenly would put immediate
 // neighbors 90° from the selected item — fully vertical, unreadable text.
-// "No duplicates" means never render a category twice, not that the handful
-// that exist must be spread across the whole circle.
 const ANGLE_STEP_DEGREES = 20
-
-// Shortest signed distance from `value` to the nearest multiple of `modulus`,
-// e.g. wrapToHalfRange(3.2, 4) -> -0.8 (3.2 is 0.8 short of the next lap of 4).
-function wrapToHalfRange(value: number, modulus: number): number {
-  return value - modulus * Math.round(value / modulus)
-}
-
-function useIsDesktopWidth(): boolean {
-  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia(DESKTOP_QUERY).matches)
-
-  useEffect(() => {
-    const mql = window.matchMedia(DESKTOP_QUERY)
-    const handleChange = () => setIsDesktop(mql.matches)
-    mql.addEventListener('change', handleChange)
-    return () => mql.removeEventListener('change', handleChange)
-  }, [])
-
-  return isDesktop
-}
+// How many steps away from active a label still renders at all. There's no
+// wraparound bringing a far-off label back around any more (see below), so
+// without a cap, scrolling far enough would swing a label's angle past
+// vertical and back toward the *other* side of the circle — this just stops
+// rendering it once it's that far, which also matches how faded-out (near
+// opacity-floor) it already was at that distance.
+const MAX_VISIBLE_DIFF = 4
 
 // A true circle whose center sits off-screen at the container's right edge:
 // the selected category always sits at the leftmost point of that circle
 // (radius pointing due left), and each neighboring category sits a fixed
 // angular step further around it — categories before it swing up-and-right,
-// categories after it swing down-and-right. With exactly one point per
-// category and no repeats, wraparound needs no special-casing: angles are
-// periodic, so rotating past a full lap is already seamless.
+// categories after it swing down-and-right.
+//
+// Discrete, not infinite: `position` is clamped to [0, slots.length - 1],
+// not wrapped. Slot 0 is always the local HOME_CATEGORY stand-in, not a
+// fetched category — "no category selected," which Home.tsx renders as a
+// vertically-centered hero with no grid. Scrolling past it (position > 0)
+// is what Home.tsx treats as "started browsing."
 //
 // Below lg, this has nowhere to go without overlapping the preview content
 // on a narrow viewport — a plain tap-to-select row takes over instead.
 export function CategorySpinner({ categories, activeSlug, onActiveChange }: CategorySpinnerProps) {
-  const count = categories.length
+  const slots = useMemo(() => [HOME_CATEGORY, ...categories], [categories])
+  const count = slots.length
   const isDesktopWidth = useIsDesktopWidth()
   const { theme } = useTheme()
   const initialIndex = Math.max(
     0,
-    categories.findIndex((category) => category.slug === activeSlug),
+    slots.findIndex((slot) => slot.slug === activeSlug),
   )
 
   const [position, setPosition] = useState(initialIndex)
@@ -98,27 +90,31 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
   }, [position])
 
   const commitIfChanged = useCallback(
-    (rawPosition: number) => {
-      if (count === 0) return
-      const index = ((Math.round(rawPosition) % count) + count) % count
+    (clampedPosition: number) => {
+      const index = Math.round(clampedPosition)
       if (index !== activeIndexRef.current) {
         activeIndexRef.current = index
-        onActiveChange(categories[index])
+        // Best-effort: unsupported on desktop browsers and iOS Safari, a
+        // no-op there rather than an error. Short enough to read as a
+        // click-stop, not a buzz.
+        navigator.vibrate?.(10)
+        onActiveChange(slots[index])
       }
     },
-    [categories, count, onActiveChange],
+    [slots, onActiveChange],
   )
 
   const movePosition = useCallback(
     (next: number) => {
-      setPosition(next)
-      commitIfChanged(next)
+      const clamped = Math.min(Math.max(next, 0), count - 1)
+      setPosition(clamped)
+      commitIfChanged(clamped)
     },
-    [commitIfChanged],
+    [commitIfChanged, count],
   )
 
   useEffect(() => {
-    if (count === 0 || !isDesktopWidth) return
+    if (!isDesktopWidth) return
 
     function handleWheel(event: WheelEvent) {
       event.preventDefault()
@@ -140,40 +136,35 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
       window.removeEventListener('wheel', handleWheel)
       window.removeEventListener('keydown', handleKeydown)
     }
-  }, [count, isDesktopWidth, movePosition])
+  }, [isDesktopWidth, movePosition])
 
-  if (count === 0) {
-    return null
-  }
-
-  // Same rounding the wheel/keyboard handlers use to decide which category
-  // is "active" — keeps the dot's color in lockstep with onActiveChange.
-  const activeIndex = ((Math.round(position) % count) + count) % count
-  const activeColor = displayColor(categories[activeIndex].color, theme)
-  // How far through one full lap of all categories the spinner has turned —
-  // wraps to 0 exactly when it lands back on the first category, which is
-  // what makes the spiral restart there instead of just looping its reveal.
-  const wrappedPosition = ((position % count) + count) % count
-  const lapProgress = wrappedPosition / count
+  // Same rounding the wheel/keyboard handlers use to decide which slot is
+  // "active" — keeps the dot's color in lockstep with onActiveChange.
+  const activeIndex = Math.round(position)
+  const activeColor = displayColor(slots[activeIndex].color, theme)
+  // How far along the whole discrete run the spinner has gone — 0 at Home,
+  // 1 at the last category. Unlike the old wraparound version this never
+  // resets on its own; it's a progress bar for the run, not a lap counter.
+  const progress = count > 1 ? position / (count - 1) : 0
 
   return (
     <>
       <ul className="m-0 flex list-none flex-wrap justify-center gap-x-5 gap-y-2 p-0 lg:hidden">
-        {categories.map((category) => (
-          <li key={category.slug}>
+        {slots.map((slot, index) => (
+          <li key={slot.slug}>
             <button
               type="button"
               onClick={() => {
-                activeIndexRef.current = categories.indexOf(category)
-                onActiveChange(category)
+                activeIndexRef.current = index
+                onActiveChange(slot)
               }}
               className="font-body whitespace-nowrap rounded-full px-2 py-1 text-sm italic"
               style={{
-                color: displayColor(category.color, theme),
-                textDecoration: category.slug === activeSlug ? 'underline' : 'none',
+                color: displayColor(slot.color, theme),
+                textDecoration: slot.slug === activeSlug ? 'underline' : 'none',
               }}
             >
-              {category.name}
+              {slot.name}
             </button>
           </li>
         ))}
@@ -195,7 +186,7 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
           }}
         >
           <div className="absolute top-1/2 right-1 -translate-y-1/2" style={{ width: SPIRAL_SIZE, height: SPIRAL_SIZE }}>
-            <FibonacciSpiral progress={lapProgress} color={activeColor} />
+            <Spiral progress={progress} color={activeColor} />
           </div>
 
           {/* Sits well clear of the selected label's right edge (LABEL_GAP is
@@ -209,8 +200,9 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
             className="absolute h-2.5 w-2.5 -translate-y-1/2 rounded-full transition-colors duration-150"
             style={{ right: RADIUS - 16, top: '50%', backgroundColor: activeColor }}
           />
-          {categories.map((category, index) => {
-            const diff = wrapToHalfRange(index - position, count)
+          {slots.map((slot, index) => {
+            const diff = index - position
+            if (Math.abs(diff) > MAX_VISIBLE_DIFF) return null
             const angleDeg = 180 - diff * ANGLE_STEP_DEGREES
             const angleRad = angleDeg * DEG_TO_RAD
             const x = RADIUS * Math.cos(angleRad)
@@ -222,21 +214,23 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
             // (each ~1.02 steps, not exactly 1), so a threshold check could
             // land between two categories and mark neither one active.
             const isActive = index === activeIndex
-            const opacity = Math.max(0.2, 1 - Math.abs(diff) / (count / 2))
+            const opacity = Math.max(0.2, 1 - Math.abs(diff) / MAX_VISIBLE_DIFF)
             return (
               <div
-                key={category.slug}
+                key={slot.slug}
                 role="option"
                 aria-selected={isActive}
-                className="font-body absolute top-1/2 origin-right text-2xl whitespace-nowrap italic"
+                className={`font-body absolute top-1/2 origin-right whitespace-nowrap italic transition-[font-size] duration-200 ${
+                  isActive ? 'text-3xl' : 'text-2xl'
+                }`}
                 style={{
                   right: -x + LABEL_GAP,
                   transform: `translateY(calc(-50% + ${y}px)) rotate(${rotation}deg)`,
-                  color: displayColor(category.color, theme),
+                  color: displayColor(slot.color, theme),
                   opacity,
                 }}
               >
-                {category.name}
+                {slot.name}
               </div>
             )
           })}
