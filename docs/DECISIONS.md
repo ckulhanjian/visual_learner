@@ -1035,6 +1035,125 @@ messages already land — `docs/ARCHITECTURE.md` §5) — every other
 `message`, which was fine for a single generic error banner but not for a
 form with a dozen fields, where "which one" matters as much as "what."
 
+### ConceptForm restructured: title, then auth | source, then notes, then optional
+
+Follow-up feedback, arriving mid-round, refined the layout twice: first "move
+date to top, mark everything else optional and smaller," with an explicit
+field order; then "split in half at the top title — auth on the left and
+source on the right, notes and optional full width below." The two combine
+into one layout, not two competing ones: title spans the full width; right
+below it, a two-column row with authorship/description metadata (summary;
+category/kind/tags; author/date made) on the left and the kind-specific
+source on the right; full width below that, notes; full width below *that*,
+everything else under a smaller "Optional" heading.
+
+**"Author" is the existing `origin` dropdown, not a new field.** There's no
+free-text author column in the schema (`docs/ARCHITECTURE.md` §2) — the
+closest concept is `origin` (human/machine/hybrid) paired with `generator`
+(which model, if not human). The form now shows `generator` only when
+`origin !== 'human'`, since it's meaningless otherwise and was previously
+visible unconditionally.
+
+**Notes got a live preview: raw Markdown next to its own rendered output,
+same component the real page uses.** `MarkdownBody` (already built for
+`/v/:slug`) takes `source` and `theme` as plain props, which is exactly
+what's needed to reuse it here unchanged — the preview pane is
+`<MarkdownBody source={notesMd} theme={theme} />`, re-rendering on every
+keystroke, so what a note will actually look like on the published page is
+never a surprise found out after submitting. `ConceptForm` calls
+`useTheme()` directly for this rather than taking `theme` as a prop, the
+same pattern `ExpandCell` and other components already use for a value
+they need but a parent has no other reason to pass down.
+
+### Chart.js renderer is built
+
+`chartjs` was the one `VisualKind` besides `vega` still falling through to
+the "renderer not built yet" placeholder — closed now that a concrete
+comparison across all six kinds needed it to be real, not a placeholder in
+the middle of the comparison. `renderers/chartjs.tsx` lazy-loads
+`chart.js/auto` via dynamic `import()`, matching the "Chart.js page never
+downloads p5" lazy-loading commitment in §2 below — a page with no
+chartjs-kind visual on it never pulls the library in at all. Config comes
+straight from `source` (a JSON string, parsed and handed to `new
+Chart(canvas, config)`), with one default applied when the visual's own
+config doesn't set it: `maintainAspectRatio: false`, so the canvas fills
+the stage box `VisualPage` already gives every kind rather than sizing
+itself off Chart.js's own default aspect ratio. `chart?.destroy()` on
+unmount/re-render (the effect's cleanup) — a Chart instance left running
+against a canvas that React has already swapped out is a real memory leak
+and console-error source, not a hypothetical one.
+
+### Sample content: one topic per kind, to compare them
+
+Five topics, each authored in whichever kind suits it best, so the request
+to "compare svg, chart, image, d3, p5 and html" lands on five genuinely
+different pieces of content rather than one topic awkwardly forced into
+five unrelated renderers:
+
+- **Polar vs. Complex Numbers** (`d3`) — Euler's formula animated: a point
+  orbits the unit circle while a label prints its rectangular and polar
+  reading live.
+- **Fourier Series: Rotating Phasor** (`p5`) — six rotating epicycles (the
+  odd harmonics) tracing a square wave, the classic way to *see* what a
+  Fourier series is doing rather than just read its formula.
+- **Musical Scale: MIDI Frequencies** (`html`) — a clickable one-octave
+  keyboard, each key showing its MIDI number and $440 \cdot 2^{(n-69)/12}$
+  frequency and playing an oscillator tone at that frequency on click.
+- **Fundamental Frequency** (`chartjs`) — a bar chart of a harmonic series
+  above a 110 Hz fundamental, amplitude falling off with each overtone.
+- **Principal Alias** (`svg`) — a 9 Hz sine (dashed) sampled 10 times a
+  second, landing on exactly the same points a 1 Hz sine (solid) would —
+  the classic aliasing demonstration, drawn as two literal sine curves
+  rather than described abstractly.
+
+**A sixth entry, `image`, is the same aliasing content again — a
+screenshot of the `svg` version, not new content of its own.** Five topics
+don't divide evenly across six kinds, and generating a *sixth*, unrelated
+topic just to fill the `image` slot would have made the set six unrelated
+demos instead of five plus one deliberate kind-for-kind comparison. Reusing
+the aliasing diagram as both `svg` and `image` (`principal-alias` /
+`principal-alias-photo`) does what "compare" actually asked for on the one
+kind that most needs a direct side-by-side: identical content, vector
+markup on one side and a flat raster of the same pixels on the other.
+
+**The `svg` and `dashed`/`solid` polylines are computed, not hand-typed.**
+`_sine_polyline`/`_sample_dots` in `seed.py` generate the coordinate
+strings from the actual sine function at seed time — a few thousand
+characters of hand-approximated curve coordinates would have been both
+tedious to write correctly and impossible to eyeball-verify as
+mathematically right. The `image` twin's PNG (`app/seed_assets/
+principal-alias.png`) was produced by rendering that exact same generated
+SVG markup in a browser and screenshotting it — the two really are the
+same content, not two independently-drawn approximations of it.
+
+**Code-bearing samples set their own dark background, in the pasted
+source itself — not left to `theme_affinity`.** `VisualPage`'s matting
+(the literal `LIGHT_MAT`/`DARK_MAT` hex, §1 above) colors the box *around*
+the iframe; it has no way to reach *into* the sandboxed document and set
+its background, since that document is intentionally opaque to the parent
+page. Without `document.body.style.background = '#1c1c1c'` as the first
+line of the `d3` and `p5` sources (and the equivalent inline in the `html`
+sample's own `<style>`), each would render as a plain white rectangle
+regardless of what `theme_affinity: "dark"` was set to — the mismatch
+would only show up as "why is this visual white," not as an error
+anywhere. All three dark samples are declared `theme_affinity: "dark"` to
+match the color they actually hardcode, not `"adaptive"`.
+
+**Known limit, not a bug: `d3`/`p5` couldn't be visually verified in this
+session's sandbox.** Both load their library from a CDN
+(`cdn.jsdelivr.net`) inside the sandboxed iframe at runtime
+(`renderers/sandboxedIframe.tsx`) — this dev sandbox's own outbound network
+policy rejects that domain (confirmed: `cdnjs.cloudflare.com` and
+`unpkg.com` were tried too, same 403 policy denial), which a real browser
+outside this sandbox won't do. The `d3` sample's page loaded and ran up to
+the point of calling `d3.select(...)` (its own
+`document.body.style.background` line took effect, visible as a plain dark
+box in a screenshot) before failing on `d3 is not defined` — consistent
+with a blocked script load, not a syntax or logic error in the source
+itself. Both scripts were reviewed by hand for correctness instead of
+executed; worth a real click-through once this runs somewhere with normal
+CDN access.
+
 ---
 
 ## 2. Visualization libraries

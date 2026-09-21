@@ -176,21 +176,29 @@ executable.
 The `kind` field is the discriminator on both ends. On the frontend, one file per
 kind under `src/renderers/`, plus a registry mapping kind → component.
 
-| kind | stored as | rendered by | sandbox | round one |
+| kind | stored as | rendered by | sandbox | built |
 |---|---|---|---|---|
-| `svg` | markup text | sanitized, inlined in DOM | no | yes |
+| `svg` | markup text | `<img src="data:...">`, not inlined into the DOM | no | yes |
 | `image` | file path | `<img>` | no | yes |
 | `chartjs` | JSON config | Chart.js in-page | no | yes |
 | `d3` | module source | iframe + D3 from CDN | **yes** | yes |
-| `html` | full document | iframe `srcdoc` | **yes** | later |
-| `p5` | sketch source | iframe + p5 from CDN | **yes** | later |
+| `html` | full document | iframe `srcdoc` | **yes** | yes |
+| `p5` | sketch source | iframe + p5 from CDN | **yes** | yes |
 | `vega` | JSON spec | vega-embed in-page | no | deferred |
 
 Data-bearing kinds render in-page, inherit site CSS, theme correctly, and export
 cleanly. Code-bearing kinds run in `<iframe sandbox="allow-scripts">` **without**
 `allow-same-origin`, so pasted model output cannot reach the DOM, storage, or API.
+`svg` renders via `<img src="data:image/svg+xml,...">` rather than inlining the
+markup straight into the page's own DOM — a data URI loaded as an image is never
+script-executable, where `dangerouslySetInnerHTML`'d SVG would be
+(`renderers/svgDataUri.ts`).
 
-Libraries load lazily — a Chart.js page never downloads p5.
+Libraries load lazily — a Chart.js page never downloads p5, via dynamic
+`import()` (`renderers/chartjs.tsx`); `d3` and `p5` load from a CDN *inside*
+their sandboxed iframe instead of joining the app's own bundle at all — see
+`docs/DECISIONS.md` for why that turned out to need no lazy-import story of
+its own.
 
 ---
 
@@ -350,11 +358,11 @@ category still selected (see `/` above and `docs/DECISIONS.md`).
 ### `/v/:slug`
 
 Full-bleed visual at the top (`renderers/registry.tsx`'s `VisualRenderer`
-— `svg` and `image` render for real; `d3`/`html`/`p5` render in the
-sandboxed iframe CLAUDE.md's security invariant requires; `chartjs`/`vega`
-fall back to an honest "renderer not built yet" placeholder rather than a
-blank box, since neither library is wired in yet — see
-`docs/DECISIONS.md`), notes below. "Full screen" is an expanded-layout
+— `svg`, `image`, and `chartjs` render for real; `d3`/`html`/`p5` render in
+the sandboxed iframe CLAUDE.md's security invariant requires; only `vega`
+falls back to an honest "renderer not built yet" placeholder rather than a
+blank box, since Vega-Lite is still deferred — see `docs/DECISIONS.md`),
+notes below. "Full screen" is an expanded-layout
 toggle (a boolean flipping the stage between its bounded box and
 `fixed inset-0`) — never the browser Fullscreen API; Escape backs out of
 it the same way any other overlay on this site does.
@@ -400,6 +408,18 @@ concern of the submission action, not a metadata field — see
 One component owning every metadata field, mounted by both `/submit` and, later,
 `/create`. Both POST the same payload shape to the same endpoint, validated by one
 schema. Adding a field later means editing one file and it appears in both places.
+
+Layout, top to bottom: title (full width), then a two-column row — the
+left column groups everything about what the visual is and who/when made
+it (summary; category/kind/tags; author/date made — "author" here is the
+origin dropdown, generator is a conditional fourth field shown only when
+origin isn't "human"), the right column is the kind-specific source (a
+file picker for `image`, a textarea otherwise, sized to match the left
+column's height) — then notes (full width, a raw-Markdown textarea next to
+its own live `MarkdownBody` preview, so what it renders on `/v/:slug` is
+never a surprise), then an "Optional" section (theme affinity, context,
+course, resources) set apart by a divider and smaller text, since none of
+those are required to make a visual real.
 
 Every dropdown (kind, theme affinity, origin, context, resource kind) is
 built from `GET /meta` — never a hardcoded option list (CLAUDE.md). The
@@ -451,9 +471,10 @@ src/
                 theme/useTheme.ts persists the theme choice)
   renderers/    svg.tsx, svgDataUri.ts (the shared data-URI helper —
                 VisualPreviewCard's own thumbnail uses it too), image.tsx,
-                sandboxedIframe.tsx (d3/html/p5, one file since they share
-                the same sandboxed-iframe mechanism), and registry.tsx
-                (VisualRenderer, the one place that switches on `kind`)
+                chartjs.tsx (lazy dynamic import of chart.js), sandboxedIframe.tsx
+                (d3/html/p5, one file since they share the same sandboxed-iframe
+                mechanism), and registry.tsx (VisualRenderer, the one place
+                that switches on `kind`)
   components/   ConceptForm, CategorySpinner, CategoryTreeNav, CategoryBubbleChart,
                 CategoryAsciiArt, VisualPreviewCard, ExpandCell, SiteHeader,
                 SiteFooter, MarkdownBody

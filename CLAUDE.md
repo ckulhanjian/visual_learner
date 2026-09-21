@@ -19,7 +19,7 @@ submit is visible until it is reviewed.
 |---|---|
 | Backend | Flask + SQLAlchemy + Marshmallow, SQLite. |
 | Frontend | React + TypeScript + Vite + Tailwind v4. `react-router-dom` for the six routes that exist: `/` (spinner, theme, layout), `/categories` (every category as an embedded bubble chart), `/c/:slug` (a category's full visual list), `/v/:slug` (one visual, full template), `/inspo` (a Pinterest board embed), and `/submit` (ConceptForm) — only `/create` isn't built. Plain HTML/JS test page (`frontend-test/`) still around for raw API poking. |
-| Deferred | Vega-Lite and the `/create` editor page, p5.js, Chart.js/vega renderers, Postgres, Alembic. |
+| Deferred | Vega-Lite and the `/create` editor page, Postgres, Alembic. All six `VisualKind`s except `vega` now render — `svg`/`image`/`chartjs` for real, `d3`/`html`/`p5` in the sandboxed iframe. |
 
 ## Commands
 

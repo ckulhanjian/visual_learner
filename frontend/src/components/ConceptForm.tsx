@@ -4,6 +4,8 @@ import type { Meta } from '../api/meta'
 import { createVisual, type NewResourceDraft, type NewVisualDraft } from '../api/visuals'
 import type { Category } from '../domain/Category'
 import type { VisualDetail } from '../domain/Visual'
+import { useTheme } from '../theme/useTheme'
+import { MarkdownBody } from './MarkdownBody'
 
 interface ConceptFormProps {
   categories: Category[]
@@ -24,6 +26,9 @@ const SOURCE_PLACEHOLDER: Record<string, string> = {
 const inputClass =
   'bg-surface border-line text-ink w-full rounded border px-2 py-1.5 font-mono text-sm focus:outline-none'
 const labelClass = 'text-ink-muted mb-1 block font-mono text-[11px] tracking-wide uppercase'
+const smallInputClass =
+  'bg-surface border-line text-ink w-full rounded border px-2 py-1 font-mono text-xs focus:outline-none'
+const smallLabelClass = 'text-ink-muted mb-1 block font-mono text-[10px] tracking-wide uppercase'
 
 function fieldName(label: string): string {
   return label.toLowerCase().replace(/\s+/g, '_')
@@ -34,17 +39,20 @@ interface FieldProps {
   children: ReactNode
   error?: string[]
   hint?: string
+  small?: boolean
 }
 
-function Field({ label, children, error, hint }: FieldProps) {
+function Field({ label, children, error, hint, small }: FieldProps) {
   return (
     <div>
-      <label className={labelClass} htmlFor={fieldName(label)}>
+      <label className={small ? smallLabelClass : labelClass} htmlFor={fieldName(label)}>
         {label}
       </label>
       {children}
       {hint && <p className="text-ink-muted mt-1 font-mono text-[11px]">{hint}</p>}
-      {error && error.length > 0 && <p className="mt-1 font-mono text-[11px] text-red-700 dark:text-red-400">{error.join(' ')}</p>}
+      {error && error.length > 0 && (
+        <p className="mt-1 font-mono text-[11px] text-red-700 dark:text-red-400">{error.join(' ')}</p>
+      )}
     </div>
   )
 }
@@ -54,7 +62,16 @@ function Field({ label, children, error, hint }: FieldProps) {
 // payload shape to the same endpoint. Not aware of the write key: that's an
 // auth concern of the *submission action*, not a field on the visual
 // itself, so SubmitPage owns it and just hands the value down.
+//
+// Layout, per feedback: title full width, then a two-column split right
+// below it — authorship/description metadata on the left, the kind-specific
+// source on the right (feedback called these "auth" and "source") — then
+// notes full width (with a live Markdown/LaTeX preview alongside the raw
+// textarea), then everything else grouped under a smaller "Optional"
+// section. The field order and the optional/required split were both
+// explicit feedback, not a guess at what "usually matters."
 export function ConceptForm({ categories, meta, writeKey }: ConceptFormProps) {
+  const { theme } = useTheme()
   const [title, setTitle] = useState('')
   const [kind, setKind] = useState(meta.visualKinds[0] ?? '')
   const [categorySlug, setCategorySlug] = useState(categories[0]?.slug ?? '')
@@ -172,204 +189,261 @@ export function ConceptForm({ categories, meta, writeKey }: ConceptFormProps) {
         </div>
       )}
 
-      {errorMessage && (
-        <p className="font-mono text-xs text-red-700 dark:text-red-400">{errorMessage}</p>
-      )}
+      {errorMessage && <p className="font-mono text-xs text-red-700 dark:text-red-400">{errorMessage}</p>}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Title" error={fieldErrors.title}>
-          <input
-            id={fieldName('Title')}
-            className={inputClass}
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            required
-          />
-        </Field>
-
-        <Field label="Category" error={fieldErrors.category_slug}>
-          <select
-            id={fieldName('Category')}
-            className={inputClass}
-            value={categorySlug}
-            onChange={(event) => setCategorySlug(event.target.value)}
-            required
-          >
-            {categories.map((category) => (
-              <option key={category.slug} value={category.slug}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Kind" error={fieldErrors.kind}>
-          <select id={fieldName('Kind')} className={inputClass} value={kind} onChange={(event) => setKind(event.target.value)}>
-            {meta.visualKinds.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Tags" hint="comma-separated — new ones are created on the fly">
-          <input
-            id={fieldName('Tags')}
-            className={inputClass}
-            value={tagsInput}
-            onChange={(event) => setTagsInput(event.target.value)}
-          />
-        </Field>
-      </div>
-
-      {kind === 'image' ? (
-        <Field label="Image file" error={fieldErrors.asset_path}>
-          <input
-            id={fieldName('Image file')}
-            type="file"
-            accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
-            className="text-ink font-mono text-sm"
-            onChange={(event) => setImageFile(event.target.files?.[0] ?? null)}
-          />
-        </Field>
-      ) : (
-        <Field label="Source" error={fieldErrors.source} hint="markup, code, or a JSON spec, depending on kind">
-          <textarea
-            id={fieldName('Source')}
-            className={`${inputClass} h-40 resize-y`}
-            value={source}
-            onChange={(event) => setSource(event.target.value)}
-            placeholder={SOURCE_PLACEHOLDER[kind] ?? ''}
-          />
-        </Field>
-      )}
-
-      <Field label="Summary" error={fieldErrors.summary_md} hint="one line, shown on grid cards">
+      <Field label="Title" error={fieldErrors.title}>
         <input
-          id={fieldName('Summary')}
-          className={inputClass}
-          value={summaryMd}
-          onChange={(event) => setSummaryMd(event.target.value)}
+          id={fieldName('Title')}
+          className={`${inputClass} text-base`}
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          required
         />
       </Field>
 
-      <Field label="Notes" error={fieldErrors.notes_md} hint="Markdown, with $inline$ or $$block$$ LaTeX">
-        <textarea
-          id={fieldName('Notes')}
-          className={`${inputClass} h-32 resize-y`}
-          value={notesMd}
-          onChange={(event) => setNotesMd(event.target.value)}
-        />
-      </Field>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {/* Left: everything about what the visual is and who/when made it. */}
+        <div className="space-y-4">
+          <Field label="Summary" error={fieldErrors.summary_md} hint="one line, shown on grid cards">
+            <input
+              id={fieldName('Summary')}
+              className={inputClass}
+              value={summaryMd}
+              onChange={(event) => setSummaryMd(event.target.value)}
+            />
+          </Field>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-        <Field label="Theme affinity" error={fieldErrors.theme_affinity}>
-          <select
-            id={fieldName('Theme affinity')}
-            className={inputClass}
-            value={themeAffinity}
-            onChange={(event) => setThemeAffinity(event.target.value)}
-          >
-            {meta.themeAffinities.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Origin" error={fieldErrors.origin}>
-          <select id={fieldName('Origin')} className={inputClass} value={origin} onChange={(event) => setOrigin(event.target.value)}>
-            {meta.origins.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Context" error={fieldErrors.context}>
-          <select
-            id={fieldName('Context')}
-            className={inputClass}
-            value={context}
-            onChange={(event) => setContext(event.target.value)}
-          >
-            {meta.contexts.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Made on" error={fieldErrors.created_on} hint="when it was made, not today">
-          <input
-            id={fieldName('Made on')}
-            type="date"
-            className={inputClass}
-            value={createdOn}
-            onChange={(event) => setCreatedOn(event.target.value)}
-          />
-        </Field>
-
-        <Field label="Generator" error={fieldErrors.generator} hint='e.g. "Claude Opus 5" — only if machine/hybrid'>
-          <input
-            id={fieldName('Generator')}
-            className={inputClass}
-            value={generator}
-            onChange={(event) => setGenerator(event.target.value)}
-          />
-        </Field>
-
-        <Field label="Course" error={fieldErrors.course} hint='e.g. "PHY 2048" — only if context is class'>
-          <input id={fieldName('Course')} className={inputClass} value={course} onChange={(event) => setCourse(event.target.value)} />
-        </Field>
-      </div>
-
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <span className={labelClass}>Resources</span>
-          <button type="button" onClick={addResource} className="text-ink-muted hover:text-ink font-mono text-[11px] uppercase">
-            + Add
-          </button>
-        </div>
-        <div className="space-y-2">
-          {resources.map((resource, index) => (
-            <div key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_2fr_auto_auto]">
-              <input
-                className={inputClass}
-                placeholder="Label"
-                value={resource.label}
-                onChange={(event) => updateResource(index, { label: event.target.value })}
-              />
-              <input
-                className={inputClass}
-                placeholder="https://..."
-                value={resource.url}
-                onChange={(event) => updateResource(index, { url: event.target.value })}
-              />
+          <div className="grid grid-cols-3 gap-2">
+            <Field label="Category" error={fieldErrors.category_slug}>
               <select
+                id={fieldName('Category')}
                 className={inputClass}
-                value={resource.kind}
-                onChange={(event) => updateResource(index, { kind: event.target.value })}
+                value={categorySlug}
+                onChange={(event) => setCategorySlug(event.target.value)}
+                required
               >
-                {meta.resourceKinds.map((value) => (
+                {categories.map((category) => (
+                  <option key={category.slug} value={category.slug}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Kind" error={fieldErrors.kind}>
+              <select
+                id={fieldName('Kind')}
+                className={inputClass}
+                value={kind}
+                onChange={(event) => setKind(event.target.value)}
+              >
+                {meta.visualKinds.map((value) => (
                   <option key={value} value={value}>
                     {value}
                   </option>
                 ))}
               </select>
-              <button
-                type="button"
-                onClick={() => removeResource(index)}
-                className="text-ink-muted hover:text-ink font-mono text-[11px] uppercase"
+            </Field>
+
+            <Field label="Tags" hint="comma-separated">
+              <input
+                id={fieldName('Tags')}
+                className={inputClass}
+                value={tagsInput}
+                onChange={(event) => setTagsInput(event.target.value)}
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Author" error={fieldErrors.origin} hint="who/what made it">
+              <select
+                id={fieldName('Author')}
+                className={inputClass}
+                value={origin}
+                onChange={(event) => setOrigin(event.target.value)}
               >
-                Remove
-              </button>
+                {meta.origins.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Date made" error={fieldErrors.created_on}>
+              <input
+                id={fieldName('Date made')}
+                type="date"
+                className={inputClass}
+                value={createdOn}
+                onChange={(event) => setCreatedOn(event.target.value)}
+              />
+            </Field>
+          </div>
+
+          {origin !== 'human' && (
+            <Field label="Generator" error={fieldErrors.generator} hint='e.g. "Claude Opus 5"'>
+              <input
+                id={fieldName('Generator')}
+                className={inputClass}
+                value={generator}
+                onChange={(event) => setGenerator(event.target.value)}
+              />
+            </Field>
+          )}
+        </div>
+
+        {/* Right: the kind-specific source, matching the left column's height. */}
+        <div className="flex flex-col">
+          {kind === 'image' ? (
+            <Field label="Image file" error={fieldErrors.asset_path}>
+              <input
+                id={fieldName('Image file')}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
+                className="text-ink font-mono text-sm"
+                onChange={(event) => setImageFile(event.target.files?.[0] ?? null)}
+              />
+            </Field>
+          ) : (
+            <div className="flex h-full flex-col">
+              <label className={labelClass} htmlFor={fieldName('Source')}>
+                Source
+              </label>
+              <textarea
+                id={fieldName('Source')}
+                className={`${inputClass} min-h-[220px] flex-1 resize-none`}
+                value={source}
+                onChange={(event) => setSource(event.target.value)}
+                placeholder={SOURCE_PLACEHOLDER[kind] ?? ''}
+              />
+              {fieldErrors.source && fieldErrors.source.length > 0 && (
+                <p className="mt-1 font-mono text-[11px] text-red-700 dark:text-red-400">
+                  {fieldErrors.source.join(' ')}
+                </p>
+              )}
             </div>
-          ))}
+          )}
+        </div>
+      </div>
+
+      {/* Notes: full width, raw Markdown next to its own live-rendered
+          preview so what it'll actually look like on the visual page is
+          never a surprise after submitting. */}
+      <div>
+        <label className={labelClass} htmlFor={fieldName('Notes')}>
+          Notes
+        </label>
+        <p className="text-ink-muted mb-1 font-mono text-[11px]">Markdown, with $inline$ or $$block$$ LaTeX</p>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <textarea
+            id={fieldName('Notes')}
+            className={`${inputClass} h-56 resize-y`}
+            value={notesMd}
+            onChange={(event) => setNotesMd(event.target.value)}
+          />
+          <div className="border-line bg-surface h-56 overflow-y-auto rounded border p-3">
+            {notesMd ? (
+              <MarkdownBody source={notesMd} theme={theme} />
+            ) : (
+              <p className="text-ink-muted font-mono text-xs">Preview appears here…</p>
+            )}
+          </div>
+        </div>
+        {fieldErrors.notes_md && fieldErrors.notes_md.length > 0 && (
+          <p className="mt-1 font-mono text-[11px] text-red-700 dark:text-red-400">{fieldErrors.notes_md.join(' ')}</p>
+        )}
+      </div>
+
+      {/* Optional: everything that isn't required to make a visual real —
+          smaller text, visually set apart by the divider above it. */}
+      <div className="border-line border-t pt-4">
+        <p className="text-ink-muted mb-3 font-mono text-[10px] tracking-wide uppercase">Optional</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Field label="Theme affinity" error={fieldErrors.theme_affinity} small>
+            <select
+              id={fieldName('Theme affinity')}
+              className={smallInputClass}
+              value={themeAffinity}
+              onChange={(event) => setThemeAffinity(event.target.value)}
+            >
+              {meta.themeAffinities.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Context" error={fieldErrors.context} small>
+            <select
+              id={fieldName('Context')}
+              className={smallInputClass}
+              value={context}
+              onChange={(event) => setContext(event.target.value)}
+            >
+              {meta.contexts.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Course" error={fieldErrors.course} small hint='only if context is "class"'>
+            <input
+              id={fieldName('Course')}
+              className={smallInputClass}
+              value={course}
+              onChange={(event) => setCourse(event.target.value)}
+            />
+          </Field>
+        </div>
+
+        <div className="mt-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className={smallLabelClass}>Resources</span>
+            <button type="button" onClick={addResource} className="text-ink-muted hover:text-ink font-mono text-[10px] uppercase">
+              + Add
+            </button>
+          </div>
+          <div className="space-y-2">
+            {resources.map((resource, index) => (
+              <div key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_2fr_auto_auto]">
+                <input
+                  className={smallInputClass}
+                  placeholder="Label"
+                  value={resource.label}
+                  onChange={(event) => updateResource(index, { label: event.target.value })}
+                />
+                <input
+                  className={smallInputClass}
+                  placeholder="https://..."
+                  value={resource.url}
+                  onChange={(event) => updateResource(index, { url: event.target.value })}
+                />
+                <select
+                  className={smallInputClass}
+                  value={resource.kind}
+                  onChange={(event) => updateResource(index, { kind: event.target.value })}
+                >
+                  {meta.resourceKinds.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => removeResource(index)}
+                  className="text-ink-muted hover:text-ink font-mono text-[10px] uppercase"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
