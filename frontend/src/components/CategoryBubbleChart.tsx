@@ -1,10 +1,8 @@
 import type { CSSProperties } from 'react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CategoryAsciiArt } from './CategoryAsciiArt'
 import type { Category } from '../domain/Category'
 import { hashString, mulberry32 } from '../domain/seededRandom'
-import { useTheme } from '../theme/useTheme'
 
 interface CategoryBubbleChartProps {
   categories: Category[]
@@ -189,7 +187,6 @@ function packBubbles(categories: Category[], width: number, height: number): Pla
 // the light-theme cream background, a known limit flagged when the
 // original literal-white feedback was implemented (see docs/DECISIONS.md).
 export function CategoryBubbleChart({ categories }: CategoryBubbleChartProps) {
-  const { theme } = useTheme()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
 
@@ -235,17 +232,11 @@ export function CategoryBubbleChart({ categories }: CategoryBubbleChartProps) {
           >
             <Link
               to={`/c/${category.slug}`}
-              className="relative flex h-full w-full flex-col items-center justify-center gap-1 overflow-hidden rounded-full border-2 text-center transition-transform hover:z-10 hover:scale-105"
+              className="flex h-full w-full flex-col items-center justify-center gap-1 overflow-hidden rounded-full border-2 text-center transition-transform hover:z-10 hover:scale-105"
               style={{ borderColor: category.color }}
             >
-              {/* The bubble's "cover" — a per-category ASCII texture, not a
-                  real snapshot (there's nothing to photograph yet for most
-                  categories) — clipped to the circle behind the label. */}
-              <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-20">
-                <CategoryAsciiArt category={category} theme={theme} animation="pulse" fontSizeClassName="text-[5px]" />
-              </div>
-              <span className="text-ink relative font-mono text-xs font-bold break-words">{category.name}</span>
-              <span className="text-ink relative font-mono text-[11px] opacity-70">{category.publishedCount}</span>
+              <span className="text-ink font-mono text-xs font-bold break-words">{category.name}</span>
+              <span className="text-ink font-mono text-[11px] opacity-70">{category.publishedCount}</span>
             </Link>
           </div>
         )

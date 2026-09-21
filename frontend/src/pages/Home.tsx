@@ -184,7 +184,7 @@ export function Home() {
                   >
                     {Array.from({ length: PREVIEW_COUNT }, (_, i) => previewState.data[i] ?? null).map((visual, i) =>
                       visual ? (
-                        <VisualPreviewCard key={visual.slug} visual={visual} />
+                        <VisualPreviewCard key={visual.slug} visual={visual} category={activeCategory} />
                       ) : (
                         // Mirrors VisualPreviewCard's own structure (an
                         // aspect-square area plus a title/summary text

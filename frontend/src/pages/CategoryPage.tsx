@@ -98,7 +98,9 @@ function CategoryPageContent({ slug }: CategoryPageContentProps) {
                   No published visuals yet.
                 </li>
               ) : (
-                state.data.visuals.map((visual) => <VisualPreviewCard key={visual.slug} visual={visual} />)
+                state.data.visuals.map((visual) => (
+                  <VisualPreviewCard key={visual.slug} visual={visual} category={state.data.category} />
+                ))
               )}
             </ul>
           </div>

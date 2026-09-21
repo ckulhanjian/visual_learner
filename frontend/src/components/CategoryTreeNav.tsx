@@ -5,7 +5,6 @@ import type { Category } from '../domain/Category'
 import type { VisualCard } from '../domain/Visual'
 import { displayColor } from '../theme/categoryColor'
 import { useTheme } from '../theme/useTheme'
-import { CategoryAsciiArt } from './CategoryAsciiArt'
 
 interface CategoryTreeNavProps {
   categories: Category[]
@@ -82,18 +81,6 @@ export function CategoryTreeNav({ categories, activeCategoryName }: CategoryTree
                     className="hover:bg-ink/5 flex items-center gap-2 rounded px-2 py-1 font-mono text-xs tracking-wide transition-colors"
                     style={{ color: displayColor(category.color, theme) }}
                   >
-                    {/* A small clickable cover swatch — the same per-category
-                        ASCII texture the /categories bubbles use, so the
-                        dropdown isn't plain text-only. Part of the Link
-                        itself, not a separate element next to it, so
-                        clicking the swatch navigates same as clicking the
-                        name. */}
-                    <span
-                      aria-hidden="true"
-                      className="border-line bg-surface flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full border"
-                    >
-                      <CategoryAsciiArt category={category} theme={theme} animation="pulse" fontSizeClassName="text-[4px]" />
-                    </span>
                     {category.name}
                   </Link>
                 </li>
@@ -117,9 +104,12 @@ export function CategoryTreeNav({ categories, activeCategoryName }: CategoryTree
                     <ul className="m-0 list-none space-y-1 p-0">
                       {hoveredVisuals.map((visual) => (
                         <li key={visual.slug}>
-                          <p className="text-ink/80 truncate py-0.5 font-mono text-xs hover:underline">
+                          <Link
+                            to={`/v/${visual.slug}`}
+                            className="text-ink/80 hover:text-ink block truncate py-0.5 font-mono text-xs hover:underline"
+                          >
                             {visual.title}
-                          </p>
+                          </Link>
                         </li>
                       ))}
                     </ul>

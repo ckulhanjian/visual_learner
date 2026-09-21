@@ -1272,9 +1272,225 @@ itself. Both scripts were reviewed by hand for correctness instead of
 executed; worth a real click-through once this runs somewhere with normal
 CDN access.
 
----
+### Dropdown fix: the visuals pane's items weren't links
 
-## 2. Visualization libraries
+Reported directly, with a screenshot: hover "Signals & Systems," click
+"Principal Alias" in the right-hand pane, nothing happens. Root cause was
+exactly what it looked like — `CategoryTreeNav`'s hover-to-preview list
+rendered each visual's title as a plain `<p>`, not a `<Link>`, left over
+from before `/v/:slug` existed (the list was built when there was nowhere
+for it to navigate to yet, and never revisited once that page shipped).
+Fixed by wrapping each title in a real `Link to={`/v/${visual.slug}`}`, the
+same fix pattern `/c/:slug` and `ExpandCell` went through for the same
+reason at earlier points in this project.
+
+### ConceptForm: shorter title, longer summary, a free-text author, no tags
+
+Several small, independent field-level fixes requested together:
+
+**Title capped at `max-w-lg`; Summary changed from a one-line `<input>` to
+a multi-line `<textarea>`.** The two fields had drifted from what they're
+actually for — title is a short display name, summary is where the
+description-length text belongs — but the layout didn't reflect that: both
+were the same one-line input, and the "one line, shown on grid cards" hint
+on Summary was actively telling people to keep it short. Capping Title's
+width (rather than shrinking its font or `<input>` height) is what makes
+it visually read as "this should be short" without adding validation that
+would reject a slightly-longer title; Summary grows as needed instead.
+
+**"Author" replaced the `origin` dropdown with `generator`'s conditional
+text field, as one always-visible free-text box.** The old layout was
+`origin` (a 3-value enum select: human/machine/hybrid) plus a `generator`
+field that only appeared when `origin !== 'human'` — two controls, one of
+them conditionally hidden, to express one idea ("who or what made this").
+Collapsing them: blank means `origin: human`, `generator: null`; any text
+means `origin: machine`, `generator:` that text. **Trade-off, not an
+oversight: `hybrid` ("machine-made, hand-edited," e.g. "Claude Opus 5,
+edited by hand") isn't reachable from this box any more.** There's no way
+for one free-text field to distinguish "made by a machine" from "made by a
+machine, then edited by hand" without either a second control (back to two
+fields) or parsing free text for intent (fragile, and the kind of
+guessing-at-meaning CLAUDE.md's controlled-vocabulary rule exists to
+avoid). The API and data model are unchanged — `origin` still accepts
+`hybrid` — so a future editing surface, or a direct API call, can still
+set it; this form's own simplification just doesn't offer that path.
+
+**"Date made" moved into the Optional section.** It was in the left
+column next to Author, implying it mattered as much as title/summary/
+category/kind — feedback asked for it demoted, and "Optional" is where
+everything else that isn't required to make a visual real already lives.
+
+**The "Upload file" control restyled as a bordered pill, matching the
+"Create visual" submit button's own treatment.** It was plain
+`text-ink-muted` text before — technically clickable, but reading as a
+caption rather than a control, easy to miss entirely next to a `Source`
+label in the same weight.
+
+**Tags removed from the form.** `tagsInput` and its `Field` are gone;
+`NewVisualDraft.tags` is still sent (as `[]`) since the schema and
+`visual_tags` join table are untouched — this is a form simplification,
+not a data-model change, and nothing stops a tag from being added directly
+via the API or a future editing surface later.
+
+### Per-category ASCII art: category page only, reused as the grid's fallback
+
+Two rounds of feedback landed on this: first, that the ASCII cover added
+to `/categories` bubbles and the header dropdown in the previous round
+should come off both — "acii art should only appear on each seperate
+category page" — leaving `/c/:slug`'s own title as the only place it
+renders (restoring the state from before that round; see the dropdown's
+"clickable" fix below for how the dropdown became clickable a different
+way). Second: the grid itself should show the actual visual, not its kind
+name as plain text, and use the ascii art as an error fallback instead —
+"if there is an error displaying the image, than the ascii code graphic
+can be displayed instead." This **resolves open question §5.1 (grid
+thumbnails)**, in a third direction neither option it posed considered: not
+a placeholder tile, and not a server-side image-generation pipeline, but a
+best-effort *live* render of the real visual, in the browser, at card
+size, with the ascii emblem as what shows when that attempt has nothing to
+work with or fails. See "Real thumbnails" below for the mechanism, and
+"the dropdown made clickable" for why the dropdown's swatch removal didn't
+reintroduce the original "not clickable" complaint from two rounds ago.
+
+**The dropdown's own "clickable" fix no longer needs the swatch it used
+before.** The ascii swatch inside `CategoryTreeNav`'s left list existed
+specifically so the dropdown had *something* to click beyond plain text —
+removing it here doesn't undo that, because the dropdown was never the
+thing lacking a click target; the right-hand visuals pane was (see "the
+dropdown fix" above). With that pane's items now real links, the swatch
+wasn't load-bearing for clickability and comes off cleanly.
+
+### Real thumbnails: a live per-kind preview, ascii art on failure
+
+The grid previously showed a real thumbnail only for `svg` (a data URI
+under `THUMBNAIL_MAX_BYTES`); every other kind fell through to a bare
+`<span>{kind}</span>` — literally the word "D3" or "P5" in a box. Feedback
+asked for each card to show what the visual actually looks like, with the
+ascii cover as the fallback when that's not possible. This is a
+meaningfully different answer to open question §5.1 than either option it
+posed (a placeholder tile, or a server-side thumbnail-generation
+pipeline): the "thumbnail" is the live visual itself, rendered small,
+generated fresh in the visitor's own browser from data already being sent
+— no new backend image pipeline, no new storage, no generation step to run
+on upload.
+
+**Backend: `thumbnail_source` generalized from "svg only" to "any kind
+under the size cap," and `asset_path` added to the card schema.**
+`VisualCardSchema.get_thumbnail_source` no longer checks `kind ==
+VisualKind.SVG` — any kind's `source` under `THUMBNAIL_MAX_BYTES` (20 KB,
+unchanged) is sent on the card, `image` excluded since its real content
+isn't `source` at all. `asset_path` is cheap to send unconditionally (it's
+a path string the browser requests, not the asset's bytes) so an `image`
+card can render its actual file directly. Both are size/cost trade-offs
+already accepted for `svg`'s original 20 KB cap — extending the same cap
+to every kind rather than inventing a separate limit per kind.
+
+**Frontend: one new component, `VisualThumbnail`, owns all of the
+per-kind logic** — `VisualPreviewCard` stays about the card's chrome
+(link, hover scale, title/summary text), matching the existing
+renderer-registry convention of keeping "what kind is this and how does it
+render" in one place rather than spread across callers:
+
+- `svg` / `image`: an `<img>` (data URI or `asset_path` directly) — same
+  mechanism as before, `image` is new.
+- `chartjs`: a real, small, live Chart.js instance (the same lazy
+  `chart.js/auto` import the full `/v/:slug` renderer already uses — see
+  §2 below), legend and animation off by default since there's no room for
+  either at card size, unless the visual's own config asks for them.
+- `d3` / `html` / `p5`: a real sandboxed iframe (`sandbox="allow-scripts"`,
+  never `allow-same-origin`, same invariant as the full renderer),
+  **lazy-mounted via `IntersectionObserver`** so a category page with many
+  code-bearing visuals doesn't load a CDN script and spin up an iframe for
+  every one of them the instant the page renders — only tiles that
+  actually scroll near the viewport do.
+- Anything else (a source too big to have been sent, `vega`, or any
+  failure from the attempts above): the category's `CategoryAsciiArt`
+  emblem, low-opacity, same as the category page's own title background.
+
+**Detecting a sandboxed preview's failure needed a new mechanism, since a
+cross-origin sandboxed iframe can't be inspected from the parent
+directly** — that opacity is exactly what `allow-scripts` without
+`allow-same-origin` is for (CLAUDE.md security invariant #1), so reading
+`contentWindow.onerror` or similar from outside isn't an option without
+weakening the sandbox, which was never on the table. Instead,
+`buildDocument` (moved out of `sandboxedIframe.tsx` into its own
+`sandboxedDocument.ts` — a plain function can't share a file with a
+component without breaking Fast Refresh, the same reasoning `svgDataUri.ts`
+was split out for) gained a `reportErrors` option: when set, it prepends a
+small inline script that registers a **capture-phase** `window`
+`'error'`/`'unhandledrejection'` listener and posts `{achkPreview: true,
+ok: false}` to the parent on either. Capture phase specifically, not the
+default bubble phase, because a resource load failure (the `<script
+src="cdn...">` tag itself failing) doesn't bubble but does fire during
+capture at an ancestor — this is exactly how a CDN block (this sandbox's
+own known limitation) gets caught, not just a thrown JS error. `postMessage`
+crosses the sandboxed origin boundary fine on its own — it isn't gated by
+`allow-same-origin` — so this adds no relaxation of the sandbox at all.
+For `html`-kind sources (already a full pasted document), the script is
+prepended directly ahead of the user's own markup; browsers still parse
+and execute a `<script>` that appears before an opening `<!doctype html>`,
+so the listener is registered before anything in the (possibly broken)
+pasted document runs. The parent (`SandboxedThumbnail` in
+`VisualThumbnail.tsx`) listens for that message (scoped to its own iframe
+via `event.source`), and separately times out to the same failure path if
+the iframe's own `onLoad` never fires at all within a few seconds — two
+different ways to fail (an explicit error vs. nothing ever arriving),
+routed to the same ascii fallback either way.
+
+**This mechanism was verified end-to-end in this very sandbox, not just
+reasoned about** — the sandbox's own long-standing CDN block (§1 above)
+means the `d3`/`p5` sample cards *reliably* hit exactly the failure path
+this was built for (a `ReferenceError: d3 is not defined` once the blocked
+CDN script leaves `d3` undefined, caught by the capture-phase listener,
+reported via `postMessage`, resulting in the ascii fallback rendering) —
+observed directly via Playwright, not inferred. The `html`-kind sample
+(no CDN dependency) rendered as a genuine live sandboxed preview in the
+same run, and `chartjs`/`svg`/`image` cards all rendered their real
+content. `d3`/`p5` would render live the same way once this runs somewhere
+with normal CDN access, per the existing known limit in §1 above.
+
+### Pinterest widget: a real race-condition fix, plus a fallback link
+
+Reported directly: "pinterest widget still doesn't work," with no new
+screenshot of the failure itself (this sandbox still can't reach
+pinterest.com to show one — see the `/inspo` entry above). Two changes,
+one a provable bug fix and one a robustness improvement for causes this
+sandbox can't rule out:
+
+**`loadPinterestScript` had a real race, independent of any network
+issue.** The previous version resolved its promise as soon as *a* `<script
+src="...pinit.js">` tag existed anywhere in the DOM — including one another
+call had appended moments earlier but that hadn't actually finished
+loading yet. Since the widget rebuilds its anchor on every board-URL or
+width change (§1 above), a second rebuild arriving before the first
+script load completed would resolve immediately, call `PinUtils.build()`
+against a `window.PinUtils` that didn't exist yet, silently no-op (`?.`),
+and depend entirely on Pinterest's own one-time auto-scan-on-load having
+happened to catch whichever anchor existed at that exact moment — a
+genuine, provable bug, not a hypothetical one. Fixed by caching a single
+promise at module scope, created once and resolved only by the real
+`script.onload`, and shared by every caller — nothing can resolve early
+again.
+
+**A "having trouble loading the embed? view it directly on Pinterest"
+fallback link appears if the anchor hasn't become an iframe within 6
+seconds.** Watched via a `MutationObserver` on the mount point rather than
+assumed — `assets.pinterest.com` is commonly present on ad/tracker
+blocklists (uBlock Origin's default lists include social-widget scripts),
+so "the widget never appears" is a plausible *ordinary* outcome for some
+visitors, not only a network outage; a direct link keeps the page useful
+either way rather than a permanently empty box.
+
+**Still not visually verified against the real script** — this sandbox's
+outbound proxy continues to block `assets.pinterest.com` outright (403,
+confirmed again this round), so the fix above addresses the one bug that
+was actually provable from here (the race) and adds a fallback for
+failure modes that can't be ruled out from here (a blocked/slow script,
+board-URL/config issues). If it's still not showing an embed after this,
+worth checking in the browser console: whether `frontend/.env` actually
+has `VITE_PINTEREST_BOARD_URL` set (it's gitignored, never committed, so
+each environment needs its own), and whether a request to
+`assets.pinterest.com` is present and succeeding in the Network tab.
 
 ### The evaluation
 
@@ -1419,10 +1635,13 @@ the queue would never catch it.
 
 Not settled. Surface options and wait.
 
-**1. Grid thumbnails.** Currently `VisualCardSchema` sends `source` only for SVG
-visuals under 20 KB; everything else gets a placeholder tile. Generating real
-thumbnails on upload means adding an image pipeline. Placeholder tiles, or worth
-the dependency?
+**1. ~~Grid thumbnails.~~ Resolved — see §1, "Real thumbnails: a live
+per-kind preview, ascii art on failure."** Answered in neither direction
+this question originally posed (a placeholder tile, or a server-side
+image-generation pipeline): every kind now attempts a real, live,
+card-sized render in the visitor's own browser from data already being
+sent, falling back to the category's ASCII emblem when that's not
+possible or fails.
 
 **2. Arc navigation scope.** Categories on the home page *and* topic titles on the
 category page, or just the home page with a plain grid underneath? Still open —

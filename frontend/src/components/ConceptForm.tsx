@@ -85,12 +85,15 @@ export function ConceptForm({ categories, meta, writeKey }: ConceptFormProps) {
   const [title, setTitle] = useState('')
   const [kind, setKind] = useState(meta.visualKinds[0] ?? '')
   const [categorySlug, setCategorySlug] = useState(categories[0]?.slug ?? '')
-  const [tagsInput, setTagsInput] = useState('')
   const [summaryMd, setSummaryMd] = useState('')
   const [notesMd, setNotesMd] = useState('')
   const [themeAffinity, setThemeAffinity] = useState(meta.themeAffinities[0] ?? 'adaptive')
-  const [origin, setOrigin] = useState(meta.origins[0] ?? 'human')
-  const [generator, setGenerator] = useState('')
+  // Free text, not the raw `origin` enum select it replaced — see
+  // docs/DECISIONS.md. Blank means "made by hand" (origin: human); anything
+  // typed here is who/what made it (origin: machine, generator: this text).
+  // `hybrid` (machine-made, hand-edited) isn't reachable from this box; the
+  // API still accepts it, this form just doesn't offer it any more.
+  const [author, setAuthor] = useState('')
   const [createdOn, setCreatedOn] = useState('')
   const [context, setContext] = useState(meta.contexts[0] ?? 'personal')
   const [course, setCourse] = useState('')
@@ -126,16 +129,15 @@ export function ConceptForm({ categories, meta, writeKey }: ConceptFormProps) {
     setSource(await file.text())
   }
 
-  // Keeps category/kind/theme/origin/context — a seeding session is usually
-  // several visuals of the same kind going into the same category, so
-  // re-picking those for every single one would be pure friction. Clears
+  // Keeps category/kind/theme affinity/context — a seeding session is
+  // usually several visuals of the same kind going into the same category,
+  // so re-picking those for every single one would be pure friction. Clears
   // everything that's genuinely per-visual.
   function resetForNextVisual() {
     setTitle('')
-    setTagsInput('')
     setSummaryMd('')
     setNotesMd('')
-    setGenerator('')
+    setAuthor('')
     setCreatedOn('')
     setCourse('')
     setSource('')
@@ -162,24 +164,22 @@ export function ConceptForm({ categories, meta, writeKey }: ConceptFormProps) {
         assetPath = uploaded.assetPath
       }
 
+      const trimmedAuthor = author.trim()
       const draft: NewVisualDraft = {
         title,
         kind,
         source: kind === 'image' ? '' : source,
         assetPath,
         themeAffinity,
-        origin,
-        generator,
+        origin: trimmedAuthor ? 'machine' : 'human',
+        generator: trimmedAuthor,
         createdOn,
         context,
         course,
         summaryMd,
         notesMd,
         categorySlug,
-        tags: tagsInput
-          .split(',')
-          .map((tag) => tag.trim())
-          .filter(Boolean),
+        tags: [],
         resources,
       }
       const created = await createVisual(draft, writeKey || undefined)
@@ -216,10 +216,12 @@ export function ConceptForm({ categories, meta, writeKey }: ConceptFormProps) {
 
       {errorMessage && <p className="font-mono text-xs text-red-700 dark:text-red-400">{errorMessage}</p>}
 
-      <Field label="Title" error={fieldErrors.title}>
+      {/* Short on purpose — a display name, not a description. That's what
+          Summary below is for. */}
+      <Field label="Title" error={fieldErrors.title} hint="short — a name, not a description">
         <input
           id={fieldName('Title')}
-          className={`${inputClass} text-base`}
+          className={`${inputClass} max-w-lg text-base`}
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           required
@@ -229,16 +231,20 @@ export function ConceptForm({ categories, meta, writeKey }: ConceptFormProps) {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Left: everything about what the visual is and who/when made it. */}
         <div className="space-y-4">
-          <Field label="Summary" error={fieldErrors.summary_md} hint="one line, shown on grid cards">
-            <input
+          <Field
+            label="Summary"
+            error={fieldErrors.summary_md}
+            hint="as long as it needs to be — shown on grid cards and the visual's own page"
+          >
+            <textarea
               id={fieldName('Summary')}
-              className={inputClass}
+              className={`${inputClass} min-h-[84px] resize-y`}
               value={summaryMd}
               onChange={(event) => setSummaryMd(event.target.value)}
             />
           </Field>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <Field label="Category" error={fieldErrors.category_slug}>
               <select
                 id={fieldName('Category')}
@@ -269,54 +275,20 @@ export function ConceptForm({ categories, meta, writeKey }: ConceptFormProps) {
                 ))}
               </select>
             </Field>
-
-            <Field label="Tags" hint="comma-separated">
-              <input
-                id={fieldName('Tags')}
-                className={inputClass}
-                value={tagsInput}
-                onChange={(event) => setTagsInput(event.target.value)}
-              />
-            </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Author" error={fieldErrors.origin} hint="who/what made it">
-              <select
-                id={fieldName('Author')}
-                className={inputClass}
-                value={origin}
-                onChange={(event) => setOrigin(event.target.value)}
-              >
-                {meta.origins.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Date made" error={fieldErrors.created_on}>
-              <input
-                id={fieldName('Date made')}
-                type="date"
-                className={inputClass}
-                value={createdOn}
-                onChange={(event) => setCreatedOn(event.target.value)}
-              />
-            </Field>
-          </div>
-
-          {origin !== 'human' && (
-            <Field label="Generator" error={fieldErrors.generator} hint='e.g. "Claude Opus 5"'>
-              <input
-                id={fieldName('Generator')}
-                className={inputClass}
-                value={generator}
-                onChange={(event) => setGenerator(event.target.value)}
-              />
-            </Field>
-          )}
+          <Field
+            label="Author"
+            error={fieldErrors.generator}
+            hint='who/what made it — leave blank for "hand-authored," or type e.g. "Claude Opus 5"'
+          >
+            <input
+              id={fieldName('Author')}
+              className={inputClass}
+              value={author}
+              onChange={(event) => setAuthor(event.target.value)}
+            />
+          </Field>
         </div>
 
         {/* Right: the kind-specific source, matching the left column's height. */}
@@ -337,7 +309,7 @@ export function ConceptForm({ categories, meta, writeKey }: ConceptFormProps) {
                 <label className={labelClass} htmlFor={fieldName('Source')}>
                   Source
                 </label>
-                <label className="text-ink-muted hover:text-ink cursor-pointer font-mono text-[11px] uppercase">
+                <label className="border-line text-ink hover:bg-surface cursor-pointer rounded-full border px-2 py-1 font-mono text-[11px] uppercase transition-colors">
                   Upload file
                   <input
                     type="file"
@@ -406,6 +378,16 @@ export function ConceptForm({ categories, meta, writeKey }: ConceptFormProps) {
       <div className="border-line border-t pt-4">
         <p className="text-ink-muted mb-3 font-mono text-[10px] tracking-wide uppercase">Optional</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Field label="Date made" error={fieldErrors.created_on} small>
+            <input
+              id={fieldName('Date made')}
+              type="date"
+              className={smallInputClass}
+              value={createdOn}
+              onChange={(event) => setCreatedOn(event.target.value)}
+            />
+          </Field>
+
           <Field label="Theme affinity" error={fieldErrors.theme_affinity} small>
             <select
               id={fieldName('Theme affinity')}

@@ -3,8 +3,11 @@ from marshmallow import Schema, fields, validate
 from app.models.enums import Context, Origin, Status, ThemeAffinity, VisualKind
 from app.schemas.resource import ResourceCreateSchema, ResourceSchema
 
-# Currently sends source only for SVG visuals under this size; everything else
-# gets a placeholder tile on the frontend. Open question in DECISIONS.md #5.1.
+# Sends `source` on the card for any kind under this size, so the grid can
+# attempt a real preview instead of a bare kind-name placeholder — a visual
+# whose source is too big just falls back to that placeholder (or the
+# frontend's ascii-art cover) on the card, same as before this existed for
+# non-svg kinds. See docs/DECISIONS.md.
 THUMBNAIL_MAX_BYTES = 20_000
 
 
@@ -29,20 +32,26 @@ class VisualCardSchema(Schema):
     attribution = fields.Str(dump_only=True)
     category = fields.Nested(CategoryRefSchema, dump_only=True)
     tags = fields.Method("get_tag_names", dump_only=True)
+    # `image`'s actual content is a file, not `source` — cheap to send on
+    # every card (it's just a path the browser requests, not the asset
+    # bytes themselves), unlike `thumbnail_source` below which is
+    # size-gated.
+    asset_path = fields.Str(dump_only=True, allow_none=True)
     thumbnail_source = fields.Method("get_thumbnail_source", dump_only=True)
 
     def get_tag_names(self, visual):
         return [tag.name for tag in visual.tags]
 
     def get_thumbnail_source(self, visual):
-        if visual.kind == VisualKind.SVG and len(visual.source or "") < THUMBNAIL_MAX_BYTES:
+        if visual.kind == VisualKind.IMAGE:
+            return None
+        if len(visual.source or "") < THUMBNAIL_MAX_BYTES:
             return visual.source
         return None
 
 
 class VisualDetailSchema(VisualCardSchema):
     source = fields.Str(dump_only=True)
-    asset_path = fields.Str(dump_only=True, allow_none=True)
     origin = fields.Str(dump_only=True)
     generator = fields.Str(dump_only=True, allow_none=True)
     context = fields.Str(dump_only=True)

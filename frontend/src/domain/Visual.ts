@@ -5,6 +5,8 @@ export interface VisualCardProps {
   summaryMd: string
   attribution: string
   thumbnailSource: string | null
+  assetPath: string | null
+  needsSandbox: boolean
 }
 
 export class VisualCard {
@@ -13,7 +15,15 @@ export class VisualCard {
   readonly kind: string
   readonly summaryMd: string
   readonly attribution: string
+  // Size-gated (see backend THUMBNAIL_MAX_BYTES) — null for `image` (whose
+  // real content is `assetPath`, not `source`) or when the real source is
+  // too big for a card-sized preview to be worth sending.
   readonly thumbnailSource: string | null
+  readonly assetPath: string | null
+  // Same discriminator VisualDetail uses — a card can't attempt a live
+  // sandboxed preview for a code-bearing kind without knowing that's what
+  // it is.
+  readonly needsSandbox: boolean
 
   constructor(props: VisualCardProps) {
     this.slug = props.slug
@@ -22,6 +32,8 @@ export class VisualCard {
     this.summaryMd = props.summaryMd
     this.attribution = props.attribution
     this.thumbnailSource = props.thumbnailSource
+    this.assetPath = props.assetPath
+    this.needsSandbox = props.needsSandbox
   }
 }
 

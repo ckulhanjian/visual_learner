@@ -281,17 +281,16 @@ Two nav surfaces, not one:
   See `docs/DECISIONS.md` for the geometry, the column layout, and why it
   isn't real scroll.
 - **`CategoryTreeNav`** — the header's "Categories" hover dropdown: every
-  category as a small clickable cover swatch (the same `CategoryAsciiArt`
-  texture used on `/categories`, part of the `Link` itself so clicking the
-  swatch navigates the same as clicking the name) plus a plain name in a
-  list, colored per category, backed by `GET /categories`. Opens on
-  hovering the header link itself (not a click), and hovering a name inside
-  it (not clicking) shows that
+  category as a plain name in a list, colored per category, backed by
+  `GET /categories`. Opens on hovering the header link itself (not a
+  click), and hovering a name inside it (not clicking) shows that
   category's visuals in a pane on the right (`GET /visuals?category=...`,
-  one request per category, fetched once on first open and cached);
-  clicking a name navigates to its page (`/c/:slug`), clicking the header
-  link itself goes to `/categories` (below). No topics here any more —
-  see `docs/DECISIONS.md`.
+  one request per category, fetched once on first open and cached) — each
+  one a real `Link` to its own `/v/:slug`, not plain text (a fixed bug:
+  see `docs/DECISIONS.md`); clicking a category name navigates to its page
+  (`/c/:slug`), clicking the header link itself goes to `/categories`
+  (below). No topics here any more, and no per-category cover art either —
+  that lives only on the category's own page now — see `docs/DECISIONS.md`.
 
 The page body is two flex columns at `lg`+: the hero text and (once a real
 category is active) the preview grid on the left, the spinner in its own
@@ -328,13 +327,12 @@ Every category as an embedded chart to pick from, on its own page —
 `CategoryBubbleChart`, backed by one `GET /categories` call. Each category
 renders as a circle sized by its published-visual count (`bubbleSize`,
 same linear interpolation `CategoryTreeNav` uses), outlined in the
-category's own subway color with no fill, the same per-category
-`CategoryAsciiArt` emblem shown low-opacity behind the label as a cover —
-there's no real image to represent a category yet, so the generative
-texture stands in for one (`docs/DECISIONS.md`) — name and count in the page's
+category's own subway color with no fill, name and count in the page's
 own ink color (`text-ink`, the same CSS variable everything else reads —
 not a literal white, which read fine in dark mode but was nearly
-invisible in light, see `docs/DECISIONS.md`). Bubbles are packed into a bounded frame within the page (20%
+invisible in light, see `docs/DECISIONS.md`). No cover art here — the
+ASCII emblem lives only on `/c/:slug` itself, per feedback (`docs/DECISIONS.md`).
+Bubbles are packed into a bounded frame within the page (20%
 whitespace left/right, 5% top, 10% bottom) via a small circle-packing
 relaxation, not laid out in a grid — a tightly clustered arrangement, but
 never touching or overlapping, either at rest, while gently floating
@@ -353,10 +351,12 @@ top-3 preview. A slug with no matching category (`not_found`, 404) renders
 as "Category not found," not a generic error; a category with zero
 published visuals renders its name and blurb with "No published visuals
 yet." instead of an empty grid. `VisualPreviewCard`, reused as-is from the
-home page's preview grid, now links each card to its own `/v/:slug`. The
-category's `CategoryAsciiArt` emblem pulses gently behind its title — the
-only page that shows one; the home page dropped its own after feedback
-(`docs/DECISIONS.md`). A small "← All Categories" line sits above the
+home page's preview grid, now links each card to its own `/v/:slug` — each
+card's own box now attempts a real preview of the visual it links to (see
+`VisualThumbnail` under §7) rather than showing its kind name as plain
+text. The category's `CategoryAsciiArt` emblem pulses gently behind its
+title — the only page that shows one; the home page dropped its own after
+feedback (`docs/DECISIONS.md`). A small "← All Categories" line sits above the
 title, left-justified with it, linking to `/categories` — separate from
 the header logo, which instead carries you back to the spinner with this
 category still selected (see `/` above and `docs/DECISIONS.md`).
@@ -424,28 +424,35 @@ One component owning every metadata field, mounted by both `/submit` and, later,
 `/create`. Both POST the same payload shape to the same endpoint, validated by one
 schema. Adding a field later means editing one file and it appears in both places.
 
-Layout, top to bottom: title (full width), then a two-column row — the
+Layout, top to bottom: title (short — a single-line input capped at
+`max-w-lg`, a name rather than a description), then a two-column row — the
 left column groups everything about what the visual is and who/when made
-it (summary; category/kind/tags; author/date made — "author" here is the
-origin dropdown, generator is a conditional fourth field shown only when
-origin isn't "human"), the right column is the kind-specific source (a
-file picker for `image`, a textarea otherwise, sized to match the left
-column's height) — then notes (full width, a raw-Markdown textarea next to
-its own live `MarkdownBody` preview, so what it renders on `/v/:slug` is
-never a surprise), then an "Optional" section (theme affinity, context,
+it (summary, now a multi-line textarea rather than a one-line input, since
+it can run as long as it needs to; category/kind; a free-text "Author"
+field), the right column is the kind-specific source (a file picker for
+`image`, a textarea otherwise, sized to match the left column's height) —
+then notes (full width, a raw-Markdown textarea next to its own live
+`MarkdownBody` preview, so what it renders on `/v/:slug` is never a
+surprise), then an "Optional" section (date made, theme affinity, context,
 course, resources) set apart by a divider and smaller text, since none of
 those are required to make a visual real.
 
-Every dropdown (kind, theme affinity, origin, context, resource kind) is
-built from `GET /meta` — never a hardcoded option list (CLAUDE.md). The
-source input changes shape with `kind`: a file picker for `image` (uploaded
-via `POST /uploads` first, its `asset_path` folded into the create payload
+**"Author" is one free-text field, not the raw `origin` enum select it
+used to be.** Blank means hand-authored (`origin: human`); anything typed
+is who/what made it (`origin: machine`, `generator:` that text) — see
+`docs/DECISIONS.md` for the trade-off this makes (the `hybrid` origin,
+"machine-made, hand-edited," isn't reachable from this simplified box; the
+API still accepts it).
+
+Every dropdown (kind, theme affinity, context, resource kind) is built
+from `GET /meta` — never a hardcoded option list (CLAUDE.md). The source
+input changes shape with `kind`: a file picker for `image` (uploaded via
+`POST /uploads` first, its `asset_path` folded into the create payload
 right before submit), a textarea with a kind-appropriate placeholder for
-everything else. Tags are free text, comma-separated — "Tags deduplicate on
-slug, created on demand" (`docs/DECISIONS.md`) is exactly what makes this
-safe; there's no need to fetch `GET /tags` first to populate a picker.
-Resources are a repeatable label/url/kind row group, added and removed
-freely before submit.
+everything else. There is no tags field — removed per feedback; the
+`tags` array is still part of the create payload and still sent (empty),
+since the schema and data model are unchanged. Resources are a repeatable
+label/url/kind row group, added and removed freely before submit.
 
 **A code-bearing kind's textarea also carries an "Upload file" control.**
 Not a real upload — there's no server endpoint for pasted code, on purpose
@@ -460,7 +467,7 @@ View your visual here" (linked to `/v/:slug`) when the response's `status`
 came back `published`, "Thank you for submitting! Your visual will be
 approved soon." when it came back `pending` — a *wrong* key still lands
 pending, so only the server's own answer can say which happened. The form
-then resets — but not entirely: category, kind, theme affinity, origin, and
+then resets — but not entirely: category, kind, theme affinity, and
 context carry over to the next submission, since seeding is usually several
 visuals of the same kind going into the same category in one sitting, and
 re-picking those every time would be pure friction. A field-level 422
@@ -479,7 +486,11 @@ src/
                 toVisualCard, exported from visuals.ts; meta.ts wraps
                 GET /meta). client.ts's apiPost/apiUpload both take an
                 optional write key, sent as X-Atlas-Key only when non-empty
-  domain/       Visual (also Resource, VisualDetail — the full /v/:slug
+  domain/       Visual (VisualCard now also carries `assetPath` and
+                `needsSandbox` — not just the size-gated `thumbnailSource` —
+                so VisualThumbnail has what it needs to attempt a real
+                per-kind preview on the grid, not just an svg data URI;
+                also Resource, VisualDetail — the full /v/:slug
                 shape, a separate class from VisualCard rather than a
                 superset, since the two pages that use them genuinely want
                 different shapes; VisualDetail also carries `status`, so a
@@ -500,14 +511,23 @@ src/
                 useWriteKey — persists the write key the same way
                 theme/useTheme.ts persists the theme choice)
   renderers/    svg.tsx, svgDataUri.ts (the shared data-URI helper —
-                VisualPreviewCard's own thumbnail uses it too), image.tsx,
-                chartjs.tsx (lazy dynamic import of chart.js), sandboxedIframe.tsx
-                (d3/html/p5, one file since they share the same sandboxed-iframe
-                mechanism), and registry.tsx (VisualRenderer, the one place
-                that switches on `kind`)
+                VisualThumbnail's svg preview uses it too), image.tsx,
+                chartjs.tsx (lazy dynamic import of chart.js),
+                sandboxedDocument.ts (buildDocument — the shared
+                srcDoc-string builder for d3/html/p5, split out from the
+                component file below it for the same Fast Refresh reason
+                svgDataUri.ts was split from svg.tsx), sandboxedIframe.tsx
+                (the SandboxedIframeRenderer component itself, for
+                /v/:slug's full render), and registry.tsx (VisualRenderer,
+                the one place that switches on `kind`)
   components/   ConceptForm, CategorySpinner, CategoryTreeNav, CategoryBubbleChart,
-                CategoryAsciiArt, VisualPreviewCard, ExpandCell, SiteHeader,
-                SiteFooter, MarkdownBody
+                CategoryAsciiArt, VisualPreviewCard, VisualThumbnail (the
+                grid card's own best-effort live preview — real image/svg
+                data, a live mini Chart.js instance, or a lazy-mounted
+                sandboxed iframe with postMessage-based error detection for
+                d3/html/p5, falling back to the category's ASCII emblem —
+                see docs/DECISIONS.md), ExpandCell, SiteHeader, SiteFooter,
+                MarkdownBody
   pages/        one file per route, mostly composing the above (Home,
                 CategoriesPage, CategoryPage, VisualPage, InspoPage,
                 SubmitPage)

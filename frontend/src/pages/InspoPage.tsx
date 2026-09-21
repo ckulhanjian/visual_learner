@@ -4,21 +4,38 @@ import { SiteHeader } from '../components/SiteHeader'
 import { useTheme } from '../theme/useTheme'
 
 const PINTEREST_SCRIPT_SRC = '//assets.pinterest.com/js/pinit.js'
+// How long to wait for Pinterest's script to turn the anchor into an
+// iframe before offering a direct link instead — covers both a slow load
+// and a load that's silently blocked (an ad/tracker blocker denying
+// assets.pinterest.com is a common, ordinary reason this never arrives,
+// not just a network outage).
+const WIDGET_TIMEOUT_MS = 6000
+
+// Cached at module scope, not re-derived from `document.querySelector` on
+// every call — the previous version's "does a script tag with this src
+// already exist" check resolved as soon as *a* tag existed in the DOM,
+// even one a moment-earlier call had appended but that hadn't actually
+// finished loading yet. That let a rebuild (a resize, a board URL change)
+// call `PinUtils.build()` before `window.PinUtils` was actually defined —
+  // a real, provable race, not hypothetical — silently no-op, and leave the
+// anchor built (or not) purely by luck of whether Pinterest's own
+// one-time auto-scan-on-load happened to catch it. One promise, created
+// once and shared by every caller, closes that: nothing resolves before
+// the script has actually loaded.
+let pinterestScriptPromise: Promise<void> | null = null
 
 function loadPinterestScript(): Promise<void> {
-  return new Promise((resolve) => {
-    const existing = document.querySelector(`script[src="${PINTEREST_SCRIPT_SRC}"]`)
-    if (existing) {
-      resolve()
-      return
-    }
-    const script = document.createElement('script')
-    script.src = PINTEREST_SCRIPT_SRC
-    script.async = true
-    script.defer = true
-    script.onload = () => resolve()
-    document.body.appendChild(script)
-  })
+  if (!pinterestScriptPromise) {
+    pinterestScriptPromise = new Promise((resolve) => {
+      const script = document.createElement('script')
+      script.src = PINTEREST_SCRIPT_SRC
+      script.async = true
+      script.defer = true
+      script.onload = () => resolve()
+      document.body.appendChild(script)
+    })
+  }
+  return pinterestScriptPromise
 }
 
 interface PinterestBoardWidgetProps {
@@ -35,11 +52,17 @@ interface PinterestBoardWidgetProps {
 // new size and asks Pinterest to build it again.
 function PinterestBoardWidget({ boardUrl, width }: PinterestBoardWidgetProps) {
   const mountRef = useRef<HTMLDivElement | null>(null)
+  // Whether the anchor has actually become an iframe yet — drives the
+  // "having trouble?" direct-link fallback below, not just a loading spinner.
+  const [widgetReady, setWidgetReady] = useState(false)
+  const [timedOut, setTimedOut] = useState(false)
 
   useEffect(() => {
     const mount = mountRef.current
     if (!mount || width <= 0) return
     let cancelled = false
+    setWidgetReady(false)
+    setTimedOut(false)
 
     mount.innerHTML = ''
     const anchor = document.createElement('a')
@@ -49,6 +72,21 @@ function PinterestBoardWidget({ boardUrl, width }: PinterestBoardWidgetProps) {
     anchor.setAttribute('data-pin-scale-width', '80')
     anchor.href = boardUrl
     mount.appendChild(anchor)
+
+    // Pinterest replaces the anchor with an <iframe> once it builds —
+    // watched directly rather than trusted to happen, since a blocked or
+    // failed script means that replacement simply never arrives.
+    const mutationObserver = new MutationObserver(() => {
+      if (mount.querySelector('iframe')) {
+        setWidgetReady(true)
+        mutationObserver.disconnect()
+      }
+    })
+    mutationObserver.observe(mount, { childList: true, subtree: true })
+
+    const timeout = window.setTimeout(() => {
+      if (!mount.querySelector('iframe')) setTimedOut(true)
+    }, WIDGET_TIMEOUT_MS)
 
     loadPinterestScript().then(() => {
       if (cancelled) return
@@ -61,10 +99,28 @@ function PinterestBoardWidget({ boardUrl, width }: PinterestBoardWidgetProps) {
 
     return () => {
       cancelled = true
+      mutationObserver.disconnect()
+      window.clearTimeout(timeout)
     }
   }, [boardUrl, width])
 
-  return <div ref={mountRef} />
+  return (
+    <div>
+      <div ref={mountRef} />
+      {/* A direct link, not a dead end — assets.pinterest.com is commonly
+          on ad/tracker blocklists, so "the widget never showed up" is an
+          ordinary outcome for some visitors, not just a network failure. */}
+      {timedOut && !widgetReady && (
+        <p className="text-ink-muted mt-3 font-mono text-xs">
+          Having trouble loading the embed?{' '}
+          <a href={boardUrl} target="_blank" rel="noreferrer" className="text-ink underline underline-offset-2">
+            View the board directly on Pinterest
+          </a>
+          .
+        </p>
+      )}
+    </div>
+  )
 }
 
 // `/inspo` — a Pinterest board of sample visualizations, embedded with

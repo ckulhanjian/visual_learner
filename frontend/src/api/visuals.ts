@@ -12,6 +12,8 @@ export interface VisualCardDTO {
   summary_md: string
   attribution: string
   thumbnail_source: string | null
+  asset_path: string | null
+  needs_sandbox: boolean
 }
 
 export function toVisualCard(dto: VisualCardDTO): VisualCard {
@@ -22,6 +24,8 @@ export function toVisualCard(dto: VisualCardDTO): VisualCard {
     summaryMd: dto.summary_md,
     attribution: dto.attribution,
     thumbnailSource: dto.thumbnail_source,
+    assetPath: dto.asset_path,
+    needsSandbox: dto.needs_sandbox,
   })
 }
 
