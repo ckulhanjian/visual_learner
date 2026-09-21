@@ -30,10 +30,19 @@ export function ExpandCell({ categorySlug, categoryColor }: ExpandCellProps) {
     <li className="flex flex-col justify-end p-2">
       <Link
         to={`/c/${categorySlug}`}
-        className="rounded px-2 py-1 text-left font-mono text-xs opacity-70 hover:italic"
+        className="group rounded px-2 py-1 text-left font-mono text-xs opacity-70 hover:italic"
         style={{ color: displayColor(categoryColor, theme) }}
       >
-        See all visuals
+        See more
+        {/* Hidden until hover rather than always reserving its width —
+            the point is a small nudge of motion on intent, not a
+            permanent icon competing with the text. */}
+        <span
+          aria-hidden="true"
+          className="ml-1 inline-block -translate-x-1 opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100"
+        >
+          &rarr;
+        </span>
       </Link>
     </li>
   )

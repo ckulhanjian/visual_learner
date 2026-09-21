@@ -17,3 +17,11 @@ function lighten(hex: string, amount: number): string {
 export function displayColor(hex: string, theme: Theme): string {
   return theme === 'dark' ? lighten(hex, 0.32) : hex
 }
+
+// A near-white fill for a category "bubble" (CategoryTreeNav) — the bubble
+// carries its own light background regardless of page theme, so its
+// outline/text use the canonical hex directly (not displayColor's
+// dark-mode lightening, which would wash out against a fill this light).
+export function pastelize(hex: string): string {
+  return lighten(hex, 0.85)
+}

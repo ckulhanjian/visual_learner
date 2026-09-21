@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { fetchCategoryDetail, type CategoryDetail } from '../api/categories'
 import { ApiError } from '../api/client'
 import { SiteFooter } from '../components/SiteFooter'
@@ -41,11 +41,25 @@ function CategoryPageContent({ slug }: CategoryPageContentProps) {
     }
   }, [slug])
 
+  const categoryName = state.status === 'ready' ? state.data.category.name : undefined
+
   return (
     <div className="flex min-h-screen flex-col">
-      <SiteHeader theme={theme} onToggleTheme={toggleTheme} />
+      <SiteHeader theme={theme} onToggleTheme={toggleTheme} activeCategoryName={categoryName} />
 
       <main className="flex-1 px-6 py-16">
+        {/* Carries the category back to Home as ?category=slug, so the
+            spinner lands back on it instead of resetting to
+            HOME_CATEGORY — see Home.tsx's read of that param. Shown
+            regardless of load state: it's the escape hatch a "not found"
+            visitor needs most. */}
+        <Link
+          to={`/?category=${slug}`}
+          className="text-ink-muted hover:text-ink mb-6 inline-block font-mono text-xs transition-colors"
+        >
+          &larr; Home
+        </Link>
+
         {state.status === 'loading' && <p className="text-ink-muted font-mono text-xs">Loading…</p>}
 
         {state.status === 'error' && (

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { fetchCategories } from '../api/categories'
 import { fetchVisualsByCategory } from '../api/visuals'
 import { CategorySpinner } from '../components/CategorySpinner'
@@ -21,6 +22,7 @@ const VERTICAL_NUDGE_FRACTION = 0.1
 
 export function Home() {
   const { theme, toggleTheme } = useTheme()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [categoriesState, setCategoriesState] = useState<LoadState<Category[]>>({ status: 'loading' })
   const [activeCategory, setActiveCategoryState] = useState<Category>(HOME_CATEGORY)
   const [previewState, setPreviewState] = useState<LoadState<VisualCard[]>>({ status: 'loading' })
@@ -43,10 +45,20 @@ export function Home() {
     let cancelled = false
     fetchCategories()
       .then((categories) => {
-        if (!cancelled) setCategoriesState({ status: 'ready', data: categories })
-        // No auto-selecting categories[0] here any more — the page starts
-        // on HOME_CATEGORY (no grid, hero centered) until the visitor
-        // actually scrolls the spinner, per docs/DECISIONS.md.
+        if (cancelled) return
+        setCategoriesState({ status: 'ready', data: categories })
+        // No auto-selecting categories[0] here — the page starts on
+        // HOME_CATEGORY (no grid, hero centered) until the visitor
+        // actually scrolls the spinner, per docs/DECISIONS.md — *unless*
+        // arriving via a category page's "back to home" link, which
+        // carries the category it came from as ?category=slug so the
+        // spinner lands back where the visitor left it, not at Home.
+        const returningSlug = searchParams.get('category')
+        const returningCategory = categories.find((category) => category.slug === returningSlug)
+        if (returningCategory) {
+          setActiveCategory(returningCategory)
+          setSearchParams({}, { replace: true })
+        }
       })
       .catch((error: unknown) => {
         if (cancelled) return
@@ -56,6 +68,11 @@ export function Home() {
     return () => {
       cancelled = true
     }
+    // Deliberately empty: this reads the URL's initial ?category= once, on
+    // the mount that follows arriving from a category page — it must not
+    // re-run and re-apply that param on every subsequent searchParams
+    // change this same effect causes via setSearchParams above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -126,7 +143,7 @@ export function Home() {
             }}
           >
             <div ref={heroRef} className="mx-auto max-w-xl space-y-3 text-center">
-              <h1 className="font-body text-3xl italic md:text-4xl">A personal atlas of visualizations</h1>
+              <h1 className="font-body text-3xl italic md:text-4xl">The Art of Visualization</h1>
               <p className="text-ink-muted">
                 Physics, signals and systems, programming, circuits — written by hand, generated,
                 or uploaded, each with the math and the story behind it.

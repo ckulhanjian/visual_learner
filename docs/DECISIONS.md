@@ -68,6 +68,24 @@ into the same code path by coincidence, and flipping the default would have
 silently overridden a returning visitor's explicit light-mode choice if that
 distinction weren't made explicit.
 
+### Renamed to Intueri
+
+The site was "Atlas" (the header logo, `<title>`, the footer's copyright
+line, the hero's own working title). Renamed to **Intueri** — the Latin
+verb the footer now glosses ("to look inside," "to contemplate," "to gaze
+at," the etymological root of "intuition") — with the hero heading changed
+to "The Art of Visualization" to match. Scoped to what's actually
+user-facing text: the logo, page `<title>`/meta description, footer, and
+hero heading changed; internal, non-user-facing identifiers that happen to
+share the old name — the `ATLAS_ENV`/`ATLAS_WRITE_KEY` env vars, the
+`X-Atlas-Key` header, the `atlas-theme` `localStorage` key — did not.
+Renaming those is a real backend/API-contract change (and, for the
+`localStorage` key, would silently drop every returning visitor's saved
+theme choice) that nothing about a display-name change calls for on its
+own; CLAUDE.md's own security invariants document `X-Atlas-Key` by that
+exact name, so changing it needs its own decision, not a side effect of
+this one.
+
 ### Frontend fonts
 
 Self-hosted via `@fontsource`, latin-only subsets — pulling the default
@@ -227,13 +245,56 @@ pushing the footer off-screen — the right side to give up, since a
 half-faded label near the edge of its visibility range is a smaller loss
 than the footer becoming unreachable without scrolling.
 
-**`CategoryTreeNav`** (header). A Khan Academy–style two-column menu: a
-fixed left list of categories, and a right pane — its own header plus a
-`max-h` + `overflow-y-auto` scrollable topic list — that swaps to whichever
-category is selected on the left. Backed by the `topics` table (see
-`docs/ARCHITECTURE.md` §2) — `Programming > Data Structures > Stack`, as deep
-as the data goes. Not the same job as the spinner: this is direct lookup for
-someone who already knows what they want, the spinner is for browsing.
+**`CategoryTreeNav`** (header) went from a Khan Academy–style topic tree to
+a bubble picker — a full redesign, not a tweak. The original was a fixed
+left list of category names and a right pane showing the selected one's
+`topics` (its own header plus a scrollable list, swapping on click).
+Feedback replaced this outright: every category now renders as a circle
+sized by its own published-visual count (`bubbleSize`, linearly
+interpolated between `MIN_BUBBLE` and `MAX_BUBBLE` against whichever
+category has the most), outlined and labeled in its canonical subway color
+but filled with a near-white pastelized version of it
+(`theme/categoryColor.ts`'s `pastelize`, an 0.85 blend toward white — much
+further than `displayColor`'s dark-mode 0.32, since this fill is meant to
+read as barely-there regardless of page theme, not as a dark-mode
+adjustment of it). The right pane now shows that category's **visuals**,
+not its topics — hovering a bubble selects it (not clicking; browsing
+several categories shouldn't cost a click each), with a grey circle behind
+the hovered bubble as the only additional hover cue. Clicking a bubble is
+the real navigation, to `/c/:slug` — the dropdown's one interactive
+destination now that page exists. Not the same job as the spinner: this is
+direct lookup for someone who already knows what they want, the spinner is
+for browsing.
+
+That grey hover circle needed the page's actual `theme` value, not
+Tailwind's `dark:` variant — this app's dark mode is a manually toggled
+`data-theme` attribute (`useTheme.ts`), independent of
+`prefers-color-scheme`, so a `dark:` utility class here would silently
+never fire when the two disagree. `pastelize`/`displayColor` already take
+`theme` as a plain value for the same reason; the bubble's hover backdrop
+follows the same rule instead of introducing the one place that doesn't.
+
+**The topics-based frontend is gone, not just unused.** Nothing renders a
+topic any more, so `api/topics.ts` and `domain/Topic.ts` were deleted
+rather than left as dead code with no caller. The backend model, the
+`GET /topics` endpoint, and the `topics` table itself are untouched — they
+remain real, valid infrastructure, just not currently called from the
+frontend. A future feature that wants a topic tree again reads from the
+same endpoint; nothing about removing the frontend plumbing changes what
+the backend can serve.
+
+**The dropdown widens with the categories it now has to show
+(`min(34rem, calc(100vw - 3rem))`, not a flat `26rem`), and stacks
+vertically below `sm`** (bubbles above, the visuals pane below, rather than
+side-by-side) — the wider fixed panel that comfortably fit nine bubbles
+plus a right pane at desktop widths overflowed a 390px phone screen
+entirely off the right edge otherwise, taking the whole visuals pane out
+of view along with it.
+
+**Category restructuring (e.g. introducing "Math" as a parent of "Physics")
+is explicitly not decided.** `topics` nest *within* a category; they don't
+let a category nest inside another one. (This remains true of the data
+model regardless of whether the frontend currently browses it as a tree.)
 
 **Category restructuring (e.g. introducing "Math" as a parent of "Physics")
 is explicitly not decided.** `topics` nest *within* a category; they don't
@@ -395,9 +456,9 @@ guaranteed to always have something else on top of it.
 
 ### `/c/:slug` is built
 
-The second page, per §6 — `ExpandCell`'s "See all visuals" is now a real
-`Link`, not a disabled stub, and the router decision above exists because
-of it.
+The second page, per §6 — `ExpandCell`'s link (see below for its label and
+hover arrow) is now a real `Link`, not a disabled stub, and the router
+decision above exists because of it.
 
 **One request, not two.** `GET /categories/:slug` already returns the
 category's own metadata *and* its full list of published visuals in a
@@ -433,11 +494,40 @@ an explicit reset.
 
 **`SiteHeader` is shared, not duplicated.** Both pages need the same logo
 (now a real `Link` home, where it was inert text with only one page to
-link to), category tree dropdown, and theme toggle — extracted out of
-`Home.tsx` into its own component (with its own `topics` fetch, the only
-data it needs) rather than copied into `CategoryPage.tsx`. `LoadState<T>`
-moved to `domain/LoadState.ts` for the same reason: both pages' fetches use
-the identical `{loading | ready | error}` shape.
+link to), category nav dropdown, and theme toggle — extracted out of
+`Home.tsx` into its own component (with its own `categories` fetch, the
+only data it needs) rather than copied into `CategoryPage.tsx`.
+`LoadState<T>` moved to `domain/LoadState.ts` for the same reason: both
+pages' fetches use the identical `{loading | ready | error}` shape.
+
+**Leaving a category page carries the category back to Home, not just the
+click that opened it.** A "← Home" link on `/c/:slug` goes to
+`/?category=<slug>`, and `Home.tsx` reads that query param once, on the
+categories-fetch effect that already runs on mount — if it matches a real
+category, that becomes the initial `activeCategory` instead of
+`HOME_CATEGORY`, and the param is stripped right after
+(`setSearchParams({}, { replace: true })`) so it doesn't linger in the URL
+once applied. `CategorySpinner` needs no changes for this: it already
+derives its starting position from whatever `activeSlug` Home hands it on
+first render, wherever that came from. Query param, not router state
+(`navigate('/', { state: {...} })`) — this survives a hard reload or a
+bookmarked/shared link, where state attached to a navigation wouldn't.
+
+**The nav dropdown's own button reflects which category page is open.**
+`SiteHeader` takes an optional `activeCategoryName`, which `CategoryPage`
+passes once its data has loaded (undefined while loading, on an error, or
+on `Home` — home never has one) — `CategoryTreeNav`'s button reads
+`Category: <name>` instead of `Categories` whenever it's set, and reverts
+the instant it isn't (leaving a category page, or that page still
+loading/erroring).
+
+**`ExpandCell` reads "See more," not "See all visuals," with a right arrow
+that fades and slides in on hover rather than sitting there permanently.**
+Feedback shortened the label and added the arrow as a hover-only detail —
+`opacity-0 -translate-x-1` at rest, `group-hover:opacity-100
+group-hover:translate-x-0` — so it reads as a small nudge of motion on
+intent, not a permanent icon competing with the text next to the visual
+cards it's already deliberately understated against.
 
 ---
 

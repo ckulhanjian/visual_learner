@@ -14,7 +14,7 @@ React (TypeScript, Vite, Tailwind v4)        :5173
   pages/        five routes, compose only (two built: Home, CategoryPage)
   components/   ConceptForm, CategorySpinner, CategoryTreeNav, VisualPreviewCard, MarkdownBody
   renderers/    one file per kind + the registry
-  domain/       Visual, Category, Tag, Topic types
+  domain/       Visual, Category, Tag types
   api/          the only place fetch() appears
         │
         │  JSON over HTTP
@@ -267,9 +267,13 @@ Two nav surfaces, not one:
   unsupported). Below `lg` (1024px) it's a plain tap-to-select row instead.
   See `docs/DECISIONS.md` for the geometry, the column layout, and why it
   isn't real scroll.
-- **`CategoryTreeNav`** — a Khan Academy–style two-column header dropdown
-  (categories on the left, a scrollable topic list on the right), backed by
-  `GET /topics`. Category → topic → sub-topic, as deep as the data goes.
+- **`CategoryTreeNav`** — the header's "Categories" dropdown: every category
+  as a bubble, diameter scaled by its published-visual count, backed by
+  `GET /categories`. Hovering a bubble (not clicking) shows that category's
+  visuals in a pane on the right (`GET /visuals?category=...`, one request
+  per category, fetched once on first open and cached); clicking one
+  navigates to its page (`/c/:slug`). No topics here any more — see
+  `docs/DECISIONS.md`.
 
 The page body is two flex columns at `lg`+: the hero text and (once a real
 category is active) the preview grid on the left, the spinner in its own
@@ -279,13 +283,20 @@ grid appearing below it once the spinner moves off slot 0 — animated between
 them with a `transform`, not a layout change. Whichever category is centered
 in the spinner drives the 4-column preview grid (`w-full` of that left
 column, shifted right of the hero above it) of that category's most recent
-three published visuals plus an `ExpandCell` as the 4th slot, linking to
-`/c/:slug`. No separate heading names the active category above the grid;
-the spinner and tree nav already show that.
+three published visuals plus an `ExpandCell` ("See more," an arrow fading in
+on hover) as the 4th slot, linking to `/c/:slug`. No separate heading names
+the active category above the grid; the spinner and tree nav already show
+that.
 
-The footer carries a copyright line and a link to the repo. `SiteHeader`
+The footer carries a copyright line, a link to the repo, and a one-line
+gloss on the name ("Intueri is a Latin verb meaning..."). `SiteHeader`
 (logo linking home, `CategoryTreeNav`, theme toggle) is shared with every
-other page rather than each one implementing its own copy.
+other page rather than each one implementing its own copy — its dropdown
+button reads "Category: <name>" instead of "Categories" while `/c/:slug`
+is open (an optional prop `CategoryPage` passes once its category has
+loaded), and that page carries a "← Home" link back to `/?category=:slug`
+so the spinner lands back on the category the visitor came from, not the
+unselected `HOME_CATEGORY` slot — see `docs/DECISIONS.md`.
 
 ### `/c/:slug`
 
@@ -327,10 +338,14 @@ src/
                 (categories.ts's fetchCategoryDetail and visuals.ts's
                 fetchVisualsByCategory share one DTO->domain mapping,
                 toVisualCard, exported from visuals.ts)
-  domain/       Visual, Category, Tag, Topic — types and logic on them
-                (Category also exports HOME_CATEGORY, a local, never-fetched
-                stand-in for "no category selected"; LoadState.ts is the
-                {loading|ready|error} shape every page's own fetches use)
+  domain/       Visual, Category, Tag — types and logic on them (Category
+                also exports HOME_CATEGORY, a local, never-fetched stand-in
+                for "no category selected"; LoadState.ts is the
+                {loading|ready|error} shape every page's own fetches use).
+                No Topic.ts — the frontend stopped consuming `/topics` once
+                CategoryTreeNav switched to a category+visuals bubble
+                picker (docs/DECISIONS.md); the backend model and endpoint
+                are untouched, just not called from here any more.
   hooks/        small hooks shared across components (useIsDesktopWidth)
   renderers/    one file per kind; the registry mapping kind → renderer
   components/   ConceptForm, CategorySpinner, CategoryTreeNav, VisualPreviewCard,

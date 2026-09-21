@@ -107,10 +107,15 @@ Do not weaken these without an explicit decision recorded in `docs/DECISIONS.md`
   above is the identity, not literally what renders on a dark background.
 - **Navigation** is two surfaces: a discrete, wheel/arrow-key-driven category
   spinner (home page — see `docs/DECISIONS.md`) with a dot marker colored to
-  match whichever category is active, and a separate tree dropdown in the
-  header backed by `topics`. Neither one navigates anywhere by itself —
-  "See all visuals" on the home page's preview grid is the one link into a
-  category's full page (`/c/:slug`).
+  match whichever category is active, and a "Categories" dropdown in the
+  header showing every category as a bubble sized by its published-visual
+  count (hover one to preview its visuals on the right, click to go to its
+  page). The spinner never navigates by itself — "See more" on the home
+  page's preview grid is its one link into a category's full page
+  (`/c/:slug`). While that page is open, the dropdown's own button reads
+  "Category: <name>" instead of "Categories," and a "← Home" link on the
+  page returns to the spinner with that same category selected, not reset
+  to the unselected state.
 - **"Full screen"** means an expanded-layout toggle, never the browser Fullscreen
   API — it behaves inconsistently and traps keyboard handling.
 
