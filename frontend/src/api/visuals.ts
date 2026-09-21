@@ -52,6 +52,7 @@ interface VisualDetailDTO extends VisualCardDTO {
   context: string
   course: string | null
   notes_md: string
+  status: string
   resources: ResourceDTO[]
 }
 
@@ -72,6 +73,7 @@ function toVisualDetail(dto: VisualDetailDTO): VisualDetail {
     notesMd: dto.notes_md,
     needsSandbox: dto.needs_sandbox,
     attribution: dto.attribution,
+    status: dto.status,
     category: dto.category,
     tags: dto.tags,
     resources: dto.resources.map((resource) => new Resource(resource)),

@@ -1139,6 +1139,124 @@ would only show up as "why is this visual white," not as an error
 anywhere. All three dark samples are declared `theme_affinity: "dark"` to
 match the color they actually hardcode, not `"adaptive"`.
 
+### `/submit` full width, file "upload" reads-and-discards, accurate success message
+
+One round of feedback bundled several `/submit`/`ConceptForm` fixes at once:
+"text and boxes should be able to take up entire width of page," a real way
+to load a file's contents into the source field ("esp for html"), and a
+clear, accurate success message instead of a generic one.
+
+**`/submit`'s `main` went from a centered `max-w-2xl` column to the page's
+full width with 10% padding left/right, no cap beyond that.** The old
+narrow column was squeezing exactly the fields (`source`, `notes_md`) that
+most benefit from horizontal room — a pasted `html` document or a paragraph
+of Markdown notes wraps far more often than it needs to in a ~42rem column.
+Flat percentage padding, not a `max-w-*` class, so the usable width still
+grows on a wider monitor instead of capping out.
+
+**File "upload" for a code-bearing kind reads the file's text client-side
+and discards the `File` object — it is not a real upload.** There is no
+server endpoint for pasted code, on purpose: `docs/ARCHITECTURE.md`'s write
+path is built around `POST /visuals` taking `source` as plain JSON text,
+and `image` is the only kind whose content is actually a file on disk
+(`POST /uploads`, §1 above). Building a second upload path for code would
+mean a second storage location and a second retrieval path for content
+that is already just text sitting in a form field. `handleSourceFile` calls
+`await file.text()` and sets `source` to the result; the `File` itself is
+never referenced again, let alone sent over the network — "grab the code
+and then trash the file," as asked. `accept` on the file input is
+kind-specific (`.svg`, `.json`, `.js`, `.html`) as a UI hint only; nothing
+server-side trusts a client-supplied extension or MIME type, since the
+content that actually lands in `source` is read as plain text regardless
+of what the browser labeled the file.
+
+**The success message reads the server's real `status`, not whether a
+write key was typed.** The previous version inferred "published" from
+`writeKey.length > 0`, which is wrong the moment the key is present but
+*wrong* — a bad key still fails `is_trusted_request()` server-side and the
+visual still lands `pending`, so the UI would have congratulated a visitor
+on a publish that didn't happen. `VisualDetail` (frontend domain type) and
+its DTO now carry the `status` the backend already returns in the create
+response; `ConceptForm` branches on `lastCreated.status === 'published'`
+for "Thank you for submitting! View your visual here" (linked to
+`/v/:slug`) versus "Thank you for submitting! Your visual will be approved
+soon." for anything else. This is the one truthful source for that
+message — there is no client-side way to know in advance whether a typed
+key is the *right* key.
+
+### Per-category ASCII art reused as a "cover," and the dropdown made clickable
+
+Feedback asked for two related things: a way to see something
+image-like per category on the `/categories` page, and for the header
+dropdown's now-inert-looking list to be clickable via more than just text.
+
+**No new image-generation or image-storage system was built for this.**
+The existing `CategoryAsciiArt` generator (`domain/categoryArt.ts`) already
+produces a stable, deterministic pattern per category slug — the same
+slug always renders the same emblem, which is functionally "a randomly
+generated pattern, saved as the cover" without actually needing a `cover`
+column, a generation job, or a place to store the result: the seed *is*
+the storage. Building a real image-cover pipeline (screenshot generation,
+upload, a new model field) is real, separate work with no visual content
+yet to justify it for most categories; reusing the existing generator was
+the option consistent with not inventing infrastructure a placeholder
+doesn't need.
+
+Shown at small size, low opacity, clipped into a circle, in two new spots:
+behind the label on each `/categories` bubble (`animation="pulse"`, not
+`"float"` — the bubble wrapper already animates its own `transform` for the
+idle-drift effect, §1 above, and stacking a second `transform`-based
+animation on a child would silently lose the fight the same way the
+hover-grow-vs-float bug already did once; `pulse` only touches `opacity`,
+so it layers safely), and as a small round swatch before each name in the
+header's "Categories" dropdown.
+
+**The dropdown swatch is part of the `Link`, not a sibling element next to
+it.** "Fix the dropdown to be clickable" was specifically about the new
+visual element doing nothing on click — putting the swatch inside the same
+`<Link to={`/c/${category.slug}`}>` that already wraps the name means
+clicking anywhere in that row, swatch included, navigates the same way;
+no separate `onClick` or second link was needed.
+
+### Pinterest widget: imperative DOM, width matches the page
+
+Implemented against the widget script the request supplied directly
+(`assets.pinterest.com/js/pinit.js`) once `developers.pinterest.com`'s own
+documentation page turned out to be unreachable from this sandbox
+(`EGRESS_BLOCKED`) — proceeded from the well-established public spec for
+the `data-pin-do="embedBoard"` anchor pattern rather than blocking on an
+unreachable source, consistent with the same domain being blocked outright
+elsewhere in this session (§1, `/inspo` section above).
+
+**The anchor Pinterest's script looks for is built with plain DOM calls
+into a ref-owned, React-children-free `<div>`, not written as JSX.**
+Pinterest's script scans for `<a data-pin-do="embedBoard">` and replaces it
+with an iframe once it loads — a DOM mutation React has no knowledge of.
+If that anchor were JSX, an unrelated re-render (a theme toggle, anything
+touching state above it) could have React reconcile that subtree against
+what Pinterest already replaced it with, fighting over the same node.
+Giving the anchor its own empty mount `<div ref={mountRef} />` with no
+React children means React never has an expectation about what's inside it
+to reconcile against; the effect that builds and appends the anchor
+re-runs (rebuilding it, then asking `PinUtils.build()` to re-scan) only
+when `boardUrl` or `width` actually change.
+
+**Width matches the page, per "should be equal to width of page" —
+tracked live via `ResizeObserver` on the content container, rounded to the
+nearest 20px before triggering a rebuild.** A fixed pixel width would drift
+out of sync the moment the viewport resized; rounding avoids rebuilding
+the widget's own iframe on every single pixel of an ordinary window drag,
+the same reasoning `CategoryBubbleChart`'s own `ResizeObserver` measurement
+already uses.
+
+**Known limit, not a bug: the live iframe couldn't be visually verified in
+this sandbox.** The anchor was confirmed present with the correct
+`data-pin-board-width` and `href` via DOM inspection; `assets.pinterest.com`
+itself returned 403 when Playwright tried to load it here, consistent with
+this sandbox's outbound proxy blocking pinterest.com domains broadly (see
+the `/inspo` entry in §1 above) — worth a real click-through once this runs
+somewhere with normal network access.
+
 **Known limit, not a bug: `d3`/`p5` couldn't be visually verified in this
 session's sandbox.** Both load their library from a CDN
 (`cdn.jsdelivr.net`) inside the sandboxed iframe at runtime
@@ -1318,6 +1436,16 @@ with curl for now?
 **5. `attribution` wording.** Currently "Hand-authored" / "Generated by Claude
 Opus 5" / "Claude Opus 5, edited by hand". One method on the model if you want it
 phrased differently.
+
+**6. Accounts, submission tracking, editing, and public comments/corrections
+("phase 2").** Raised directly: how to edit already-submitted content, see
+whether a submission has been approved, track one's own submissions, and
+whether any of that requires signup — plus a public comments/corrections
+system, and private-vs-public visual ownership. Entirely undecided; this is
+a genuine architecture question (accounts touch the data model, the write
+protection layers in §4, and every page that currently assumes "published"
+is the only visibility state), not a default to pick silently. See the
+options laid out in conversation before implementing any of it.
 
 ---
 

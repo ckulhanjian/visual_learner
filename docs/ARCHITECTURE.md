@@ -281,9 +281,12 @@ Two nav surfaces, not one:
   See `docs/DECISIONS.md` for the geometry, the column layout, and why it
   isn't real scroll.
 - **`CategoryTreeNav`** — the header's "Categories" hover dropdown: every
-  category as a plain name in a list, colored per category, backed by
-  `GET /categories`. Opens on hovering the header link itself (not a
-  click), and hovering a name inside it (not clicking) shows that
+  category as a small clickable cover swatch (the same `CategoryAsciiArt`
+  texture used on `/categories`, part of the `Link` itself so clicking the
+  swatch navigates the same as clicking the name) plus a plain name in a
+  list, colored per category, backed by `GET /categories`. Opens on
+  hovering the header link itself (not a click), and hovering a name inside
+  it (not clicking) shows that
   category's visuals in a pane on the right (`GET /visuals?category=...`,
   one request per category, fetched once on first open and cached);
   clicking a name navigates to its page (`/c/:slug`), clicking the header
@@ -325,7 +328,10 @@ Every category as an embedded chart to pick from, on its own page —
 `CategoryBubbleChart`, backed by one `GET /categories` call. Each category
 renders as a circle sized by its published-visual count (`bubbleSize`,
 same linear interpolation `CategoryTreeNav` uses), outlined in the
-category's own subway color with no fill, name and count in the page's
+category's own subway color with no fill, the same per-category
+`CategoryAsciiArt` emblem shown low-opacity behind the label as a cover —
+there's no real image to represent a category yet, so the generative
+texture stands in for one (`docs/DECISIONS.md`) — name and count in the page's
 own ink color (`text-ink`, the same CSS variable everything else reads —
 not a literal white, which read fine in dark mode but was nearly
 invisible in light, see `docs/DECISIONS.md`). Bubbles are packed into a bounded frame within the page (20%
@@ -394,14 +400,23 @@ points at, not pasted third-party code, so CLAUDE.md's code-bearing-kind
 sandbox rule doesn't apply. The board URL comes from `VITE_PINTEREST_BOARD_URL`
 (`frontend/.env`, documented in `frontend/.env.example`) — never a
 hardcoded/guessed URL; unset, the page shows a plain "not configured yet"
-message instead of a broken embed.
+message instead of a broken embed. The embed anchor is built imperatively
+(plain `document.createElement`) into a ref-owned, React-children-free mount
+point rather than as JSX, since Pinterest's own script later replaces that
+anchor with an iframe — a DOM mutation React must never try to reconcile.
+Its width tracks the page's own content width via `ResizeObserver` (rounded
+to the nearest 20px so an ordinary resize doesn't rebuild the widget on
+every pixel), so the board always renders equal to the width of the page,
+per feedback, not a fixed pixel width. See `docs/DECISIONS.md`.
 
 ### `/submit`
 
 `ConceptForm` plus a write-key input `SubmitPage` owns itself (an auth
 concern of the submission action, not a metadata field — see
 `docs/DECISIONS.md`) — built now; `/create` will mount the same
-`ConceptForm` later, per below.
+`ConceptForm` later, per below. `main` uses the page's full width, with 10%
+padding left/right rather than a centered narrow column, so the long lines
+that show up in source/notes textareas have room to breathe.
 
 ### ConceptForm
 
@@ -432,9 +447,21 @@ safe; there's no need to fetch `GET /tags` first to populate a picker.
 Resources are a repeatable label/url/kind row group, added and removed
 freely before submit.
 
-On success the form shows a link to the new visual's `/v/:slug` and resets
-— but not entirely: category, kind, theme affinity, origin, and context
-carry over to the next submission, since seeding is usually several
+**A code-bearing kind's textarea also carries an "Upload file" control.**
+Not a real upload — there's no server endpoint for pasted code, on purpose
+(`POST /visuals` takes `source` as JSON text either way). Choosing a file
+reads its text via the File API (`file.text()`) straight into the `source`
+field and discards the `File` object; nothing about the file itself is ever
+sent anywhere, for any kind, including `html`. See `docs/DECISIONS.md`.
+
+On success the form shows the real outcome of the submission, not an
+assumption from whether a write key was typed: "Thank you for submitting!
+View your visual here" (linked to `/v/:slug`) when the response's `status`
+came back `published`, "Thank you for submitting! Your visual will be
+approved soon." when it came back `pending` — a *wrong* key still lands
+pending, so only the server's own answer can say which happened. The form
+then resets — but not entirely: category, kind, theme affinity, origin, and
+context carry over to the next submission, since seeding is usually several
 visuals of the same kind going into the same category in one sitting, and
 re-picking those every time would be pure friction. A field-level 422
 (Marshmallow's own validation) shows next to the field it's about, read
@@ -455,7 +482,10 @@ src/
   domain/       Visual (also Resource, VisualDetail — the full /v/:slug
                 shape, a separate class from VisualCard rather than a
                 superset, since the two pages that use them genuinely want
-                different shapes), Category, Tag — types and logic on them
+                different shapes; VisualDetail also carries `status`, so a
+                just-submitted visual's actual pending/published outcome
+                comes from the server's own answer, never inferred from
+                whether a write key was typed), Category, Tag — types and logic on them
                 (Category also exports HOME_CATEGORY, a local, never-fetched
                 stand-in for "no category selected"; LoadState.ts is the
                 {loading|ready|error} shape every page's own fetches use).

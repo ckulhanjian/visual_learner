@@ -23,6 +23,16 @@ const SOURCE_PLACEHOLDER: Record<string, string> = {
   p5: '// assumes p5 is already loaded\nfunction setup() { createCanvas(400, 400) }\nfunction draw() { ... }',
 }
 
+// What file picker to offer per code-shaped kind, so "upload a file" picks
+// a sensible extension instead of accepting anything.
+const SOURCE_FILE_ACCEPT: Record<string, string> = {
+  svg: '.svg,image/svg+xml',
+  chartjs: '.json,application/json',
+  d3: '.js,text/javascript',
+  html: '.html,.htm,text/html',
+  p5: '.js,text/javascript',
+}
+
 const inputClass =
   'bg-surface border-line text-ink w-full rounded border px-2 py-1.5 font-mono text-sm focus:outline-none'
 const labelClass = 'text-ink-muted mb-1 block font-mono text-[11px] tracking-wide uppercase'
@@ -105,6 +115,17 @@ export function ConceptForm({ categories, meta, writeKey }: ConceptFormProps) {
     setResources((current) => current.filter((_, i) => i !== index))
   }
 
+  // "Upload" for code-bearing kinds isn't a real upload — there's no server
+  // endpoint for pasted code, on purpose (docs/ARCHITECTURE.md's write
+  // protection layers are built around POST /visuals taking source as JSON
+  // text). This just reads the chosen file's text into `source` and drops
+  // the File object; nothing about the file itself ever leaves the browser
+  // or reaches the network.
+  async function handleSourceFile(file: File | null) {
+    if (!file) return
+    setSource(await file.text())
+  }
+
   // Keeps category/kind/theme/origin/context — a seeding session is usually
   // several visuals of the same kind going into the same category, so
   // re-picking those for every single one would be pure friction. Clears
@@ -179,13 +200,17 @@ export function ConceptForm({ categories, meta, writeKey }: ConceptFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {lastCreated && (
-        <div className="border-line bg-surface rounded border p-3 font-mono text-xs">
-          <span className="text-ink">Created "{lastCreated.title}"</span>
-          {' — '}
-          <a href={`/v/${lastCreated.slug}`} className="text-ink underline underline-offset-2">
-            view it
-          </a>
-          {writeKey ? '' : ' (queued as pending — no write key was sent).'}
+        <div className="border-line bg-surface rounded border p-4 font-mono text-sm">
+          {lastCreated.status === 'published' ? (
+            <>
+              Thank you for submitting!{' '}
+              <a href={`/v/${lastCreated.slug}`} className="text-ink underline underline-offset-2">
+                View your visual here
+              </a>
+            </>
+          ) : (
+            'Thank you for submitting! Your visual will be approved soon.'
+          )}
         </div>
       )}
 
@@ -308,9 +333,26 @@ export function ConceptForm({ categories, meta, writeKey }: ConceptFormProps) {
             </Field>
           ) : (
             <div className="flex h-full flex-col">
-              <label className={labelClass} htmlFor={fieldName('Source')}>
-                Source
-              </label>
+              <div className="mb-1 flex items-center justify-between">
+                <label className={labelClass} htmlFor={fieldName('Source')}>
+                  Source
+                </label>
+                <label className="text-ink-muted hover:text-ink cursor-pointer font-mono text-[11px] uppercase">
+                  Upload file
+                  <input
+                    type="file"
+                    accept={SOURCE_FILE_ACCEPT[kind]}
+                    className="hidden"
+                    onChange={(event) => {
+                      void handleSourceFile(event.target.files?.[0] ?? null)
+                      // Clears the input so choosing the same file again
+                      // (e.g. after editing it and re-exporting) still fires
+                      // onChange the next time.
+                      event.target.value = ''
+                    }}
+                  />
+                </label>
+              </div>
               <textarea
                 id={fieldName('Source')}
                 className={`${inputClass} min-h-[220px] flex-1 resize-none`}
@@ -318,6 +360,9 @@ export function ConceptForm({ categories, meta, writeKey }: ConceptFormProps) {
                 onChange={(event) => setSource(event.target.value)}
                 placeholder={SOURCE_PLACEHOLDER[kind] ?? ''}
               />
+              <p className="text-ink-muted mt-1 font-mono text-[11px]">
+                Uploading reads the file's text in above — the file itself is never sent anywhere.
+              </p>
               {fieldErrors.source && fieldErrors.source.length > 0 && (
                 <p className="mt-1 font-mono text-[11px] text-red-700 dark:text-red-400">
                   {fieldErrors.source.join(' ')}

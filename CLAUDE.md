@@ -139,8 +139,13 @@ Do not weaken these without an explicit decision recorded in `docs/DECISIONS.md`
   `CategoryAsciiArt`) — concentric, noise-perturbed rings of density
   characters, seeded off the category's slug so it's stable across
   reloads, no two categories drawing the same pattern by construction. Shown
-  low-opacity, pulsing, behind a category page's own title only — not on
-  the home page, which shows none at all (see `docs/DECISIONS.md`).
+  low-opacity, pulsing, behind a category page's own title — not on
+  the home page, which shows none at all (see `docs/DECISIONS.md`) — and
+  reused at small size as that category's "cover": clipped into a circle
+  behind the label on each `/categories` bubble, and as a small clickable
+  swatch on each entry in the header's "Categories" dropdown. There is no
+  real per-category image yet, so this generated, stable-per-slug texture
+  stands in as the visual identity until one exists.
 - **"Full screen"** means an expanded-layout toggle, never the browser Fullscreen
   API — it behaves inconsistently and traps keyboard handling.
 

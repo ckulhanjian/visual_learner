@@ -68,6 +68,7 @@ export interface VisualDetailProps {
   notesMd: string
   needsSandbox: boolean
   attribution: string
+  status: string
   category: VisualCategoryRef
   tags: string[]
   resources: Resource[]
@@ -95,6 +96,10 @@ export class VisualDetail {
   readonly notesMd: string
   readonly needsSandbox: boolean
   readonly attribution: string
+  // "pending" vs "published" — what the submission actually did with the
+  // request, not just whether a write key was typed into the form (a
+  // *wrong* key still lands pending; only the server knows which happened).
+  readonly status: string
   readonly category: VisualCategoryRef
   readonly tags: string[]
   readonly resources: Resource[]
@@ -115,6 +120,7 @@ export class VisualDetail {
     this.notesMd = props.notesMd
     this.needsSandbox = props.needsSandbox
     this.attribution = props.attribution
+    this.status = props.status
     this.category = props.category
     this.tags = props.tags
     this.resources = props.resources

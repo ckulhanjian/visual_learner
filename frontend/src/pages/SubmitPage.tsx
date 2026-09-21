@@ -43,36 +43,38 @@ export function SubmitPage() {
     <div className="flex min-h-screen flex-col">
       <SiteHeader theme={theme} onToggleTheme={toggleTheme} />
 
-      <main className="flex-1 px-6 py-16">
-        <div className="mx-auto max-w-2xl">
-          <h1 className="font-body mb-2 text-3xl italic md:text-4xl">Submit</h1>
-          <p className="text-ink-muted mb-8 text-sm">
-            Anonymous submissions are queued for review. Add your write key below to publish immediately instead.
-          </p>
+      {/* Feedback: the form should use the page's full width, not a
+          centered narrow column — 10% padding left/right, no max-width cap
+          beyond that, so long lines in the source/notes textareas actually
+          get room to breathe. */}
+      <main className="flex-1 px-[10%] py-16">
+        <h1 className="font-body mb-2 text-3xl italic md:text-4xl">Submit</h1>
+        <p className="text-ink-muted mb-8 text-sm">
+          Anonymous submissions are queued for review. Add your write key below to publish immediately instead.
+        </p>
 
-          <div className="mb-8">
-            <label htmlFor="write-key" className="text-ink-muted mb-1 block font-mono text-[11px] tracking-wide uppercase">
-              Write key
-            </label>
-            <input
-              id="write-key"
-              type="password"
-              autoComplete="off"
-              className="bg-surface border-line text-ink w-full max-w-xs rounded border px-2 py-1.5 font-mono text-sm focus:outline-none"
-              value={writeKey}
-              onChange={(event) => setWriteKey(event.target.value)}
-              placeholder="optional — publishes immediately"
-            />
-          </div>
-
-          {state.status === 'loading' && <p className="text-ink-muted font-mono text-xs">Loading…</p>}
-          {state.status === 'error' && (
-            <p className="font-mono text-xs text-red-700 dark:text-red-400">Couldn't load the form: {state.message}</p>
-          )}
-          {state.status === 'ready' && (
-            <ConceptForm categories={state.data.categories} meta={state.data.meta} writeKey={writeKey} />
-          )}
+        <div className="mb-8">
+          <label htmlFor="write-key" className="text-ink-muted mb-1 block font-mono text-[11px] tracking-wide uppercase">
+            Write key
+          </label>
+          <input
+            id="write-key"
+            type="password"
+            autoComplete="off"
+            className="bg-surface border-line text-ink w-full max-w-xs rounded border px-2 py-1.5 font-mono text-sm focus:outline-none"
+            value={writeKey}
+            onChange={(event) => setWriteKey(event.target.value)}
+            placeholder="optional — publishes immediately"
+          />
         </div>
+
+        {state.status === 'loading' && <p className="text-ink-muted font-mono text-xs">Loading…</p>}
+        {state.status === 'error' && (
+          <p className="font-mono text-xs text-red-700 dark:text-red-400">Couldn't load the form: {state.message}</p>
+        )}
+        {state.status === 'ready' && (
+          <ConceptForm categories={state.data.categories} meta={state.data.meta} writeKey={writeKey} />
+        )}
       </main>
 
       <footer className="border-line flex justify-center border-t px-6 py-5">
