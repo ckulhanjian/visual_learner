@@ -108,18 +108,31 @@ Do not weaken these without an explicit decision recorded in `docs/DECISIONS.md`
 - **Navigation** is two surfaces: a discrete, wheel/arrow-key-driven category
   spinner (home page — see `docs/DECISIONS.md`) with a dot marker colored to
   match whichever category is active, and a "Categories" link in the header
-  that both opens a hover dropdown (every category as a plain name in a
-  list, colored per category, hover one to preview its visuals on the
+  that both opens a hover dropdown (every category as a plain name, no
+  count, colored per category, hover one to preview its visuals on the
   right, click one to go to its page) and, on click, goes to its own
   dedicated page (`/categories`) showing every category as a larger
   embedded bubble chart — outlined circles, no fill, white text, tightly
   clustered inside a bounded frame but never touching or overlapping, at
-  rest or on hover. The spinner never navigates by itself — "See more" on
-  the home page's preview grid is its one link into a category's full page
-  (`/c/:slug`). While a category page is open, the header link reads
-  "Category: <name>" instead of "Categories," and a "← Home" link on the
-  page returns to the spinner with that same category selected, not reset
-  to the unselected state.
+  rest, on hover, or while gently floating (see below). The spinner never
+  navigates by itself — "See more" on the home page's preview grid is its
+  one link into a category's full page (`/c/:slug`). A category page has
+  no separate "back" link; the header logo itself carries you home,
+  landing the spinner on that same category rather than the unselected
+  state — see below. While a category page is open, the header link reads
+  "Category: <name>" instead of "Categories."
+- **The logo is set in the same italic EB Garamond as the hero title**, not
+  the mono/uppercase treatment other header chrome uses — it reads as part
+  of the page's voice, not as UI. Clicking it is context-dependent: from a
+  category page it goes home *carrying that category* (the spinner lands on
+  it, not on the unselected state); from the home page itself it resets the
+  spinner back to the unselected state. See `docs/DECISIONS.md`.
+- **Every category gets a generative ASCII emblem** (`domain/categoryArt.ts`,
+  `CategoryAsciiArt`) — concentric, noise-perturbed rings of density
+  characters, seeded off the category's slug so it's stable across
+  reloads, no two categories drawing the same pattern by construction. Shown
+  low-opacity behind the home page's hero title (floating) and behind a
+  category page's own title (pulsing) — decorative only, `aria-hidden`.
 - **"Full screen"** means an expanded-layout toggle, never the browser Fullscreen
   API — it behaves inconsistently and traps keyboard handling.
 

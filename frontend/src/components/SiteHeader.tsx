@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { fetchCategories } from '../api/categories'
 import type { Category } from '../domain/Category'
 import type { LoadState } from '../domain/LoadState'
@@ -14,14 +14,21 @@ interface SiteHeaderProps {
   // link's label from "Categories" to "Category: <name>" while a category
   // page is open, per docs/DECISIONS.md.
   activeCategoryName?: string
+  // Set only by Home.tsx: clicking the logo while already on `/` needs to
+  // reset the spinner to HOME_CATEGORY, which a same-path <Link> can't do
+  // on its own (navigating to the page you're already on is a no-op — no
+  // location change, no remount, nothing re-runs). Every other page leaves
+  // this unset and gets plain Link navigation.
+  onLogoClick?: () => void
 }
 
 // Shared by every page: the logo (links home), the category hover
 // dropdown (fetches its own `categories` data, since it's the only thing
 // here that needs it), and the theme toggle. Pulled out of Home.tsx once a
 // second page needed the identical header rather than a copy of it.
-export function SiteHeader({ theme, onToggleTheme, activeCategoryName }: SiteHeaderProps) {
+export function SiteHeader({ theme, onToggleTheme, activeCategoryName, onLogoClick }: SiteHeaderProps) {
   const [categoriesState, setCategoriesState] = useState<LoadState<Category[]>>({ status: 'loading' })
+  const location = useLocation()
 
   useEffect(() => {
     let cancelled = false
@@ -39,10 +46,30 @@ export function SiteHeader({ theme, onToggleTheme, activeCategoryName }: SiteHea
     }
   }, [])
 
+  // From a category page, the logo goes home *carrying that category*
+  // (`/?category=:slug` — the same param Home.tsx already reads on mount
+  // to land the spinner back where the visitor came from) rather than to
+  // a bare, unselected home — replacing the dedicated "← Home" link that
+  // used to do this. Derived from the URL, not a prop, so this needs no
+  // wiring from CategoryPage at all.
+  const categoryPageMatch = location.pathname.match(/^\/c\/([^/]+)/)
+  const logoHref = categoryPageMatch ? `/?category=${categoryPageMatch[1]}` : '/'
+
   return (
     <header className="border-line flex items-center justify-between border-b px-6 py-5">
       <div className="flex items-center gap-4">
-        <Link to="/" className="font-mono text-sm tracking-[0.2em] uppercase">
+        <Link
+          to={logoHref}
+          onClick={
+            onLogoClick
+              ? (event) => {
+                  event.preventDefault()
+                  onLogoClick()
+                }
+              : undefined
+          }
+          className="font-body text-xl italic"
+        >
           Achk
         </Link>
         {categoriesState.status === 'ready' ? (

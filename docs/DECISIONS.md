@@ -661,17 +661,18 @@ only data it needs) rather than copied into `CategoryPage.tsx`.
 pages' fetches use the identical `{loading | ready | error}` shape.
 
 **Leaving a category page carries the category back to Home, not just the
-click that opened it.** A "← Home" link on `/c/:slug` goes to
-`/?category=<slug>`, and `Home.tsx` reads that query param once, on the
-categories-fetch effect that already runs on mount — if it matches a real
-category, that becomes the initial `activeCategory` instead of
-`HOME_CATEGORY`, and the param is stripped right after
-(`setSearchParams({}, { replace: true })`) so it doesn't linger in the URL
-once applied. `CategorySpinner` needs no changes for this: it already
-derives its starting position from whatever `activeSlug` Home hands it on
-first render, wherever that came from. Query param, not router state
-(`navigate('/', { state: {...} })`) — this survives a hard reload or a
-bookmarked/shared link, where state attached to a navigation wouldn't.
+click that opened it.** Originally a dedicated "← Home" link on `/c/:slug`
+(superseded below — the logo does this job now), going to
+`/?category=<slug>`, which `Home.tsx` reads once, on the categories-fetch
+effect that already runs on mount — if it matches a real category, that
+becomes the initial `activeCategory` instead of `HOME_CATEGORY`, and the
+param is stripped right after (`setSearchParams({}, { replace: true })`)
+so it doesn't linger in the URL once applied. `CategorySpinner` needs no
+changes for this: it already derives its starting position from whatever
+`activeSlug` Home hands it on first render, wherever that came from. Query
+param, not router state (`navigate('/', { state: {...} })`) — this
+survives a hard reload or a bookmarked/shared link, where state attached
+to a navigation wouldn't.
 
 **The nav dropdown's own button reflects which category page is open.**
 `SiteHeader` takes an optional `activeCategoryName`, which `CategoryPage`
@@ -688,6 +689,131 @@ Feedback shortened the label and added the arrow as a hover-only detail —
 group-hover:translate-x-0` — so it reads as a small nudge of motion on
 intent, not a permanent icon competing with the text next to the visual
 cards it's already deliberately understated against.
+
+### Per-category ASCII art, idle motion, and the logo replacing "← Home"
+
+One round of feedback asked for several things at once: an ASCII "design"
+per category, shown behind the hero title on `/` and behind the title on
+`/c/:slug`; the `/categories` bubbles floating with a small idle motion;
+the home page's preview grid getting a "fade in and up" entrance whenever
+the spinner lands on a new category; the dropdown's published counts gone;
+the logo matched to the hero's font; and the "← Home" link replaced by
+making the logo itself carry you home to the right place.
+
+**The ASCII art is generated, not hand-drawn, and doesn't spell the
+category's name.** Nine (soon more) bespoke pieces of ASCII art is either
+a maintenance burden that goes stale the moment a category is added, or a
+generator that produces one automatically — the generator was the only
+option consistent with "One definition per concept" (CLAUDE.md). The first
+version tried to spell the category name in text repeating along the ring
+paths (matching one of the reference images, a piece that spells "TOGETHER"
+along a wave). Dropped: `generateCategoryArt` fills a character grid in
+raster (row-major) scan order, and a roughly circular ring intersects most
+rows at two disconnected arcs — left side, then right side — so consecutive
+letters of the name landed in visually unrelated places instead of
+following the curve, reading as jumbled noise rather than legible text.
+Plain density characters (`: . + * #`, denser toward the center of each
+ring's own thickness, thinning at the edge with a little seeded jitter so
+it reads as scattered dots rather than a plotted curve) don't have that
+problem and are what most of the reference images actually are anyway.
+
+**Seeded off the category's slug, not its name or id.** Slugs are the
+permanent identity (CLAUDE.md); seeding off the name would silently change
+a category's art if it were ever renamed, which nothing about a display
+rename should do. `domain/seededRandom.ts` (`hashString` + a mulberry32
+PRNG) is shared by the art generator and the bubble-chart float below —
+one small deterministic-PRNG utility rather than two copies of the same
+15 lines.
+
+**Where the art sits: a fixed-size box centered on the title via absolute
+positioning + `translate(-50%, -50%)`, not sized by its parent's own
+height.** Both the hero (`Home.tsx`) and the category title
+(`CategoryPage.tsx`) wrap a couple of short lines of text — nowhere near
+tall enough to hold a few dozen rows of ASCII art if the art were sized to
+fill that box's natural height. Anchoring the art's own fixed box to the
+parent's center instead means its size is a constant chosen for how it
+looks, independent of how tall the title text happens to be.
+
+**Home uses `animation="float"`, the category page uses `"pulse"` — a
+deliberate difference, not an oversight.** The feedback offered "pulse or
+float" without assigning either to a specific spot. Float (a slow
+`translateY` bob) suits the hero, a headline moment where a little motion
+draws the eye; pulse (a slow opacity breathe) suits sitting behind a
+title next to a blurb and a grid of cards, where a *moving* watermark
+would be more distracting than a *breathing* one this far from the page's
+main focal point.
+
+**The home page always shows the current category's art, including
+`HOME_CATEGORY` (the unselected state) — no special-casing to hide it
+before a category is picked.** `HOME_CATEGORY` is a real `Category`
+instance with its own slug (`'home'`) and color, so `generateCategoryArt`
+and `CategoryAsciiArt` need no null-check or fallback for it; the idle
+state gets its own (muted-grey) emblem for free rather than an empty gap
+behind the hero until the visitor scrolls.
+
+**Bubble float lives on a wrapper `<div>` around the `Link`, not on the
+`Link` itself.** The `Link` already has `hover:scale-105` for the
+hover-grow effect (a prior round). A running CSS animation and a `:hover`
+rule both setting the same `transform` property fight over it every
+frame, and the animation wins — the float would have silently overridden
+the grow effect the moment it was hovered. Splitting them onto two nested
+elements means each owns its own `transform` and neither clobbers the
+other. Per-bubble duration (4-7s), delay (0-3s), and drift direction all
+come from `bubbleFloat`, seeded off `` `${slug}-float` `` — a different
+seed suffix than the art generator's plain `slug`, so a category's ASCII
+pattern and its bubble's float phase don't move in lockstep just because
+they happen to share a hash input.
+
+**The packing relaxation now reserves room for the float, not just the
+hover grow.** `HOVER_SAFETY_FACTOR` already inflated the minimum distance
+between bubbles so a hover-grown bubble couldn't touch its neighbor;
+floating adds an independent way for two bubbles to close the gap between
+them (both could drift toward each other at once), so `packBubbles` now
+also adds a flat `FLOAT_MARGIN` (twice the float amplitude — the worst
+case) to that same minimum distance. Skipping this would have meant
+"nothing overlaps, unless you wait for the float to carry two bubbles
+together" — the exact bug the previous round's fix was about, reopened by
+a different animation.
+
+**The preview grid's entrance animation is one CSS class plus a `key`, not
+a change to `VisualPreviewCard` or `ExpandCell`.** `.animate-fade-in-up-stagger
+> *` targets the grid's own direct children — whichever mix of real cards,
+the empty placeholder, and `ExpandCell` happens to be there — with a
+per-`nth-child` delay, entirely from the parent's class. Neither child
+component needs to know this animation exists or take a prop for it.
+Replaying it on every category change (not just the first mount) needed
+`key={activeCategory.slug}` on the `<ul>` itself: a CSS `animation` only
+plays when the element is freshly inserted (or the animation-name
+changes), and without the key React would keep reusing the same `<ul>`
+node across categories, so only the very first landing would ever animate.
+
+**Counts came out of the dropdown; they stay on `/categories`.** Feedback
+was specific to "the dropdown menu" — `CategoryTreeNav`'s list now shows
+just the name. The bubble chart's counts are what the bubbles are
+*sized by* (`bubbleSize`), so removing them there would hide the reason
+the circles are different sizes at all; nothing asked for that.
+
+**The logo's font changed from mono/uppercase to the hero's own italic EB
+Garamond**, a plain style fix — the logo previously read as UI chrome
+(same treatment as the "Categories" pill next to it) rather than the
+site's own name, and the hero already established what that voice looks
+like.
+
+**The logo replaces the "← Home" link rather than sitting next to it.**
+Removing the link meant something still had to carry a category page's
+visitor back to the spinner landed on the right category — reusing the
+logo (present on every page already) instead of adding a second nav
+element made the header simpler, not more crowded. `SiteHeader` derives
+the logo's `href` from the current URL itself (a `/^\/c\/([^/]+)/` match
+against `useLocation().pathname`) rather than a prop `CategoryPage` would
+have had to pass, so no wiring changed on that page beyond deleting the
+old link. On `/`, a plain `Link` to `/` is a navigation no-op — clicking a
+link to the page you're already on doesn't remount anything or re-run any
+effect — so resetting the spinner needed an actual callback: `SiteHeader`
+takes an optional `onLogoClick`, which only `Home.tsx` supplies
+(`() => setActiveCategory(HOME_CATEGORY)`), intercepting the click with
+`preventDefault` instead of letting the `Link` navigate. Every other page
+leaves `onLogoClick` unset and gets ordinary `Link` behavior.
 
 ---
 

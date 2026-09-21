@@ -287,9 +287,15 @@ them with a `transform`, not a layout change. Whichever category is centered
 in the spinner drives the 4-column preview grid (`w-full` of that left
 column, shifted right of the hero above it) of that category's most recent
 three published visuals plus an `ExpandCell` ("See more," an arrow fading in
-on hover) as the 4th slot, linking to `/c/:slug`. No separate heading names
-the active category above the grid; the spinner and tree nav already show
-that.
+on hover) as the 4th slot, linking to `/c/:slug`. The grid itself fades and
+slides up into place (keyed by slug, so it replays every time the spinner
+lands on a new category, not just on first render — see `docs/DECISIONS.md`).
+No separate heading names the active category above the grid; the spinner
+and tree nav already show that.
+
+The active category's `CategoryAsciiArt` emblem floats gently behind the
+hero title, low-opacity and `aria-hidden` — see `domain/categoryArt.ts`
+and `docs/DECISIONS.md`.
 
 The footer carries a copyright line, a link to the repo, and a one-line
 gloss on the name ("Achk (աչք) is the Armenian word for 'eye.'"). `SiteHeader`
@@ -297,9 +303,10 @@ gloss on the name ("Achk (աչք) is the Armenian word for 'eye.'"). `SiteHeader
 other page rather than each one implementing its own copy — its dropdown
 link reads "Category: <name>" instead of "Categories" while `/c/:slug`
 is open (an optional prop `CategoryPage` passes once its category has
-loaded), and that page carries a "← Home" link back to `/?category=:slug`
-so the spinner lands back on the category the visitor came from, not the
-unselected `HOME_CATEGORY` slot — see `docs/DECISIONS.md`.
+loaded). The logo itself, not a separate link, is how a category page
+gets back to the spinner with that category still selected — see
+`docs/DECISIONS.md` for the logo's full click behavior and why a category
+page carries no dedicated "back" link any more.
 
 ### `/categories`
 
@@ -311,11 +318,12 @@ category's own subway color with no fill, name and count in white text
 inside it. Bubbles are packed into a bounded frame within the page (20%
 whitespace left/right, 5% top, 10% bottom) via a small circle-packing
 relaxation, not laid out in a grid — a tightly clustered arrangement, but
-never touching or overlapping, either at rest or while a bubble grows on
-hover. Clicking one navigates straight to `/c/:slug`. See
-`docs/DECISIONS.md` for the packing algorithm and why there's no
-hover-to-preview pane here (that lives in `CategoryTreeNav`'s dropdown
-instead).
+never touching or overlapping, either at rest, while gently floating
+(a small per-bubble idle drift, seeded off the slug), or while a bubble
+grows on hover. Clicking one navigates straight to `/c/:slug`. See
+`docs/DECISIONS.md` for the packing algorithm (including how it accounts
+for the float and hover growth) and why there's no hover-to-preview pane
+here (that lives in `CategoryTreeNav`'s dropdown instead).
 
 ### `/c/:slug`
 
@@ -326,7 +334,11 @@ top-3 preview. A slug with no matching category (`not_found`, 404) renders
 as "Category not found," not a generic error; a category with zero
 published visuals renders its name and blurb with "No published visuals
 yet." instead of an empty grid. `VisualPreviewCard`, reused as-is from the
-home page's preview grid.
+home page's preview grid. The category's `CategoryAsciiArt` emblem pulses
+gently behind its title, same component and low-opacity treatment as the
+home page's hero, `animation="pulse"` instead of `"float"` there. No
+dedicated "back to home" link — the header logo does that job, see `/`
+above and `docs/DECISIONS.md`.
 
 ### `/v/:slug`
 
@@ -361,14 +373,18 @@ src/
                 also exports HOME_CATEGORY, a local, never-fetched stand-in
                 for "no category selected"; LoadState.ts is the
                 {loading|ready|error} shape every page's own fetches use).
-                No Topic.ts — the frontend stopped consuming `/topics` once
+                categoryArt.ts generates each category's ASCII emblem;
+                seededRandom.ts is the small deterministic PRNG it (and
+                CategoryBubbleChart's float timing) is built on. No
+                Topic.ts — the frontend stopped consuming `/topics` once
                 the category picker switched to a bubble chart
                 (docs/DECISIONS.md); the backend model and endpoint
                 are untouched, just not called from here any more.
   hooks/        small hooks shared across components (useIsDesktopWidth)
   renderers/    one file per kind; the registry mapping kind → renderer
-  components/   ConceptForm, CategorySpinner, CategoryBubbleChart, VisualPreviewCard,
-                ExpandCell, SiteHeader, SiteFooter, MarkdownBody
+  components/   ConceptForm, CategorySpinner, CategoryTreeNav, CategoryBubbleChart,
+                CategoryAsciiArt, VisualPreviewCard, ExpandCell, SiteHeader,
+                SiteFooter, MarkdownBody
   pages/        one file per route, mostly composing the above (Home,
                 CategoriesPage, CategoryPage)
   theme/        tokens, subway palette, dark mode, categoryColor (dark-mode

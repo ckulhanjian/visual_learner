@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { fetchCategories } from '../api/categories'
 import { fetchVisualsByCategory } from '../api/visuals'
+import { CategoryAsciiArt } from '../components/CategoryAsciiArt'
 import { CategorySpinner } from '../components/CategorySpinner'
 import { ExpandCell } from '../components/ExpandCell'
 import { SiteFooter } from '../components/SiteFooter'
@@ -139,7 +140,14 @@ export function Home() {
     // scrolls internally if its own content still doesn't fit, so the
     // footer stays visible without scrolling the page to reach it.
     <div className="flex h-dvh flex-col overflow-hidden">
-      <SiteHeader theme={theme} onToggleTheme={toggleTheme} />
+      <SiteHeader
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        // Clicking the logo while already home resets the spinner to
+        // HOME_CATEGORY — a same-path Link click is otherwise a no-op, so
+        // SiteHeader can't do this on its own without a callback.
+        onLogoClick={() => setActiveCategory(HOME_CATEGORY)}
+      />
 
       <main
         ref={mainRef}
@@ -153,7 +161,18 @@ export function Home() {
               transition: 'transform 500ms ease',
             }}
           >
-            <div ref={heroRef} className="mx-auto max-w-xl space-y-3 text-center">
+            <div ref={heroRef} className="relative mx-auto max-w-xl space-y-3 text-center">
+              {/* The active category's ASCII emblem, floating gently behind
+                  the hero text — purely decorative (aria-hidden, inside
+                  CategoryAsciiArt), sized and centered independently of the
+                  text above it rather than filling this box's own (much
+                  shorter) natural height. */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-1/2 -z-10 flex h-56 w-72 -translate-x-1/2 -translate-y-1/2 items-center justify-center overflow-hidden opacity-15"
+              >
+                <CategoryAsciiArt category={activeCategory} theme={theme} animation="float" />
+              </div>
               <h1 className="font-body text-3xl italic md:text-4xl">The Art of Visualization</h1>
               <p className="text-ink-muted">
                 Physics, signals and systems, programming, circuits — written by hand, generated,
@@ -168,7 +187,13 @@ export function Home() {
                   <p className="font-mono text-xs text-red-700 dark:text-red-400">{previewState.message}</p>
                 )}
                 {previewState.status === 'ready' && (
-                  <ul className="m-0 grid grid-cols-2 gap-4 p-0 sm:grid-cols-4">
+                  // Keyed by slug so the grid remounts — and its entrance
+                  // animation replays — every time the spinner lands on a
+                  // new category, not just on the very first render.
+                  <ul
+                    key={activeCategory.slug}
+                    className="animate-fade-in-up-stagger m-0 grid grid-cols-2 gap-4 p-0 sm:grid-cols-4"
+                  >
                     {Array.from({ length: PREVIEW_COUNT }, (_, i) => previewState.data[i] ?? null).map((visual, i) =>
                       visual ? (
                         <VisualPreviewCard key={visual.slug} visual={visual} />

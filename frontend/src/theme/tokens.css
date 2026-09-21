@@ -37,3 +37,89 @@ body {
   color: var(--color-ink);
   font-family: var(--font-body);
 }
+
+/*
+ * Idle animations shared across pages — plain CSS classes rather than
+ * Tailwind's arbitrary-value animation utilities, since these are reused
+ * as-is in more than one place (CategoryAsciiArt, CategoryBubbleChart, the
+ * home page's preview grid) and a named keyframe is easier to tune once
+ * than an inline `animate-[...]` repeated at every call site.
+ */
+@keyframes ascii-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+.animate-ascii-float {
+  animation: ascii-float 7s ease-in-out infinite;
+}
+
+@keyframes ascii-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.animate-ascii-pulse {
+  animation: ascii-pulse 4.5s ease-in-out infinite;
+}
+
+/* CategoryBubbleChart: a small, per-bubble drift (own CSS variables set
+   inline, seeded per category — see the component) so bubbles don't all
+   bob in lockstep. The float is on a wrapper around the Link, not the
+   Link itself, so it doesn't fight the Link's own `hover:scale-105` —
+   both would otherwise be setting `transform` and one would clobber the
+   other every frame. */
+@keyframes bubble-float {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(var(--float-dx, 4px), var(--float-dy, -6px));
+  }
+}
+.animate-bubble-float {
+  animation: bubble-float var(--float-duration, 5s) ease-in-out infinite;
+  animation-delay: var(--float-delay, 0s);
+}
+
+/* Home page's preview grid: applied to the <ul> itself (keyed by the
+   active category so it remounts, and the animation replays, every time
+   the spinner lands on a new one), targeting its own direct children —
+   VisualPreviewCard's <li>, ExpandCell's <li>, and the empty-slot
+   placeholder — without either of those components needing to know this
+   animation exists. */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in-up-stagger > * {
+  opacity: 0;
+  animation: fade-in-up 420ms ease-out forwards;
+}
+.animate-fade-in-up-stagger > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.animate-fade-in-up-stagger > *:nth-child(2) {
+  animation-delay: 60ms;
+}
+.animate-fade-in-up-stagger > *:nth-child(3) {
+  animation-delay: 120ms;
+}
+.animate-fade-in-up-stagger > *:nth-child(4) {
+  animation-delay: 180ms;
+}

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { fetchCategoryDetail, type CategoryDetail } from '../api/categories'
 import { ApiError } from '../api/client'
+import { CategoryAsciiArt } from '../components/CategoryAsciiArt'
 import { SiteFooter } from '../components/SiteFooter'
 import { SiteHeader } from '../components/SiteHeader'
 import { VisualPreviewCard } from '../components/VisualPreviewCard'
@@ -48,18 +49,6 @@ function CategoryPageContent({ slug }: CategoryPageContentProps) {
       <SiteHeader theme={theme} onToggleTheme={toggleTheme} activeCategoryName={categoryName} />
 
       <main className="flex-1 px-6 py-16">
-        {/* Carries the category back to Home as ?category=slug, so the
-            spinner lands back on it instead of resetting to
-            HOME_CATEGORY — see Home.tsx's read of that param. Shown
-            regardless of load state: it's the escape hatch a "not found"
-            visitor needs most. */}
-        <Link
-          to={`/?category=${slug}`}
-          className="text-ink-muted hover:text-ink mb-6 inline-block font-mono text-xs transition-colors"
-        >
-          &larr; Home
-        </Link>
-
         {state.status === 'loading' && <p className="text-ink-muted font-mono text-xs">Loading…</p>}
 
         {state.status === 'error' && (
@@ -71,7 +60,17 @@ function CategoryPageContent({ slug }: CategoryPageContentProps) {
 
         {state.status === 'ready' && (
           <div className="mx-auto max-w-5xl">
-            <div className="max-w-xl space-y-2">
+            <div className="relative max-w-xl space-y-2">
+              {/* The category's own ASCII emblem, gently pulsing behind its
+                  title — same component and idea as the home page's hero
+                  background, sized and centered independently of the
+                  title/blurb text's own (much shorter) height. */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-1/2 -z-10 flex h-48 w-64 -translate-x-1/2 -translate-y-1/2 items-center justify-center overflow-hidden opacity-15"
+              >
+                <CategoryAsciiArt category={state.data.category} theme={theme} animation="pulse" />
+              </div>
               <h1
                 className="font-body text-3xl italic md:text-4xl"
                 style={{ color: displayColor(state.data.category.color, theme) }}

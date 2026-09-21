@@ -1,6 +1,8 @@
+import type { CSSProperties } from 'react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Category } from '../domain/Category'
+import { hashString, mulberry32 } from '../domain/seededRandom'
 
 interface CategoryBubbleChartProps {
   categories: Category[]
@@ -27,6 +29,12 @@ const HOVER_SAFETY_FACTOR = 1.12
 // touch or overlap.
 const MAX_SHRINK_ATTEMPTS = 6
 const SHRINK_FACTOR = 0.88
+// Bubbles idly float (see `bubbleFloat` below) by up to this many pixels
+// on each axis. Two neighbors could drift toward each other at once, so
+// packing has to reserve twice this on top of the hover margin, or the
+// float itself could produce the overlap the packing was built to prevent.
+const FLOAT_AMPLITUDE = 7
+const FLOAT_MARGIN = FLOAT_AMPLITUDE * 2
 
 // Diameter scales with how many published visuals a category has — the
 // point of "bubbles," not a fixed grid of same-size circles. A category
@@ -42,6 +50,28 @@ interface Placement {
   size: number
   x: number
   y: number
+}
+
+interface FloatParams {
+  duration: number
+  delay: number
+  dx: number
+  dy: number
+}
+
+// Deterministic per-category float — a different seed suffix than any
+// other use of the category's slug (`categoryArt.ts` seeds its own pattern
+// straight off the slug), otherwise two independently "random" things would
+// move in lockstep for no reason other than sharing a hash input.
+function bubbleFloat(slug: string): FloatParams {
+  const rand = mulberry32(hashString(`${slug}-float`))
+  const angle = rand() * Math.PI * 2
+  return {
+    duration: 4 + rand() * 3,
+    delay: rand() * 3,
+    dx: Math.cos(angle) * FLOAT_AMPLITUDE,
+    dy: Math.sin(angle) * FLOAT_AMPLITUDE,
+  }
 }
 
 // Keeps a bubble's center inside [lo, hi] when the margin box is wide
@@ -61,7 +91,7 @@ function hasOverlap(points: Placement[]): boolean {
       const a = points[i]
       const b = points[j]
       const distance = Math.hypot(b.x - a.x, b.y - a.y)
-      const minDistance = ((a.size + b.size) / 2) * HOVER_SAFETY_FACTOR
+      const minDistance = ((a.size + b.size) / 2) * HOVER_SAFETY_FACTOR + FLOAT_MARGIN
       if (distance < minDistance - 0.5) return true
     }
   }
@@ -83,7 +113,7 @@ function relax(points: Placement[], minX: number, maxX: number, minY: number, ma
         const dx = b.x - a.x
         const dy = b.y - a.y
         const distance = Math.hypot(dx, dy) || 0.01
-        const minDistance = ((a.size + b.size) / 2) * HOVER_SAFETY_FACTOR
+        const minDistance = ((a.size + b.size) / 2) * HOVER_SAFETY_FACTOR + FLOAT_MARGIN
         if (distance < minDistance) {
           moved = true
           const overlap = (minDistance - distance) / 2
@@ -174,23 +204,40 @@ export function CategoryBubbleChart({ categories }: CategoryBubbleChartProps) {
 
   return (
     <div ref={containerRef} className="relative h-[70vh] w-full">
-      {placements.map(({ category, size: diameter, x, y }) => (
-        <Link
-          key={category.slug}
-          to={`/c/${category.slug}`}
-          className="absolute flex flex-col items-center justify-center gap-1 rounded-full border-2 text-center transition-transform hover:z-10 hover:scale-105"
-          style={{
-            width: diameter,
-            height: diameter,
-            left: x - diameter / 2,
-            top: y - diameter / 2,
-            borderColor: category.color,
-          }}
-        >
-          <span className="font-mono text-xs font-bold break-words text-white">{category.name}</span>
-          <span className="font-mono text-[11px] text-white opacity-70">{category.publishedCount}</span>
-        </Link>
-      ))}
+      {placements.map(({ category, size: diameter, x, y }) => {
+        const float = bubbleFloat(category.slug)
+        return (
+          // The float animation lives on this wrapper, not the Link below —
+          // both it and the Link's own `hover:scale-105` set `transform`,
+          // and an idly-running CSS animation always wins that fight, which
+          // would have silently killed the hover-grow effect.
+          <div
+            key={category.slug}
+            className="animate-bubble-float absolute"
+            style={
+              {
+                left: x - diameter / 2,
+                top: y - diameter / 2,
+                width: diameter,
+                height: diameter,
+                '--float-duration': `${float.duration}s`,
+                '--float-delay': `${float.delay}s`,
+                '--float-dx': `${float.dx}px`,
+                '--float-dy': `${float.dy}px`,
+              } as CSSProperties
+            }
+          >
+            <Link
+              to={`/c/${category.slug}`}
+              className="flex h-full w-full flex-col items-center justify-center gap-1 rounded-full border-2 text-center transition-transform hover:z-10 hover:scale-105"
+              style={{ borderColor: category.color }}
+            >
+              <span className="font-mono text-xs font-bold break-words text-white">{category.name}</span>
+              <span className="font-mono text-[11px] text-white opacity-70">{category.publishedCount}</span>
+            </Link>
+          </div>
+        )
+      })}
     </div>
   )
 }

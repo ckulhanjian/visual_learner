@@ -81,7 +81,7 @@ export function CategoryTreeNav({ categories, activeCategoryName }: CategoryTree
                     className="hover:bg-ink/5 block rounded px-2 py-1 font-mono text-xs tracking-wide transition-colors"
                     style={{ color: displayColor(category.color, theme) }}
                   >
-                    {category.name} <span className="text-ink-muted">({category.publishedCount})</span>
+                    {category.name}
                   </Link>
                 </li>
               ))}
