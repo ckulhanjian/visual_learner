@@ -15,16 +15,23 @@ interface ExpandCellProps {
 // already sizes every cell in the row to match the tallest one. Bottom-
 // aligning this cell's own content is what actually lines its text up with
 // where the cards' text ends, not fighting the grid for height.
+//
+// No `items-center` either: a visual card's title/summary text starts flush
+// against its cell's left edge, so centering this button horizontally made
+// it float out of step with them instead of reading as the 4th member of
+// the same row. Default (stretch) cross-axis alignment lets the button fill
+// the cell's width, which puts its own (left-aligned) text at that same
+// left edge.
 export function ExpandCell({ categoryColor }: ExpandCellProps) {
   const { theme } = useTheme()
   return (
-    <li className="flex flex-col items-center justify-end p-2">
+    <li className="flex flex-col justify-end p-2">
       <button
         type="button"
         disabled
         aria-disabled="true"
         title="Category pages aren't built yet"
-        className="rounded px-2 py-1 font-mono text-xs opacity-70 hover:italic"
+        className="rounded px-2 py-1 text-left font-mono text-xs opacity-70 hover:italic"
         style={{ color: displayColor(categoryColor, theme) }}
       >
         See all visuals

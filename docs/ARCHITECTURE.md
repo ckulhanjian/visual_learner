@@ -263,11 +263,10 @@ Two nav surfaces, not one:
   wrapping. Driven by wheel delta and arrow keys (not real page scroll — the
   page itself doesn't move), with a dot marking whichever slot is centered,
   colored to match it, the active label's font size growing to mark the
-  landing, a short `navigator.vibrate` on each step (a no-op where
-  unsupported), and a `Spiral` drawing in behind the labels as the run
-  progresses. Below `lg` (1024px) it's a plain tap-to-select row instead. See
-  `docs/DECISIONS.md` for the geometry, the column layout, and why it isn't
-  real scroll.
+  landing, and a short `navigator.vibrate` on each step (a no-op where
+  unsupported). Below `lg` (1024px) it's a plain tap-to-select row instead.
+  See `docs/DECISIONS.md` for the geometry, the column layout, and why it
+  isn't real scroll.
 - **`CategoryTreeNav`** — a Khan Academy–style two-column header dropdown
   (categories on the left, a scrollable topic list on the right), backed by
   `GET /topics`. Category → topic → sub-topic, as deep as the data goes.
@@ -319,7 +318,7 @@ src/
   hooks/        small hooks shared across components (useIsDesktopWidth)
   renderers/    one file per kind; the registry mapping kind → renderer
   components/   ConceptForm, CategorySpinner, CategoryTreeNav, VisualPreviewCard,
-                ExpandCell, Spiral, SiteFooter, MarkdownBody
+                ExpandCell, SiteFooter, MarkdownBody
   pages/        one file per route, mostly composing the above
   theme/        tokens, subway palette, dark mode, categoryColor (dark-mode
                 lightening of category colors for text)

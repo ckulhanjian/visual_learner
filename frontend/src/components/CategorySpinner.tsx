@@ -4,7 +4,6 @@ import { HOME_CATEGORY } from '../domain/Category'
 import { useIsDesktopWidth } from '../hooks/useIsDesktopWidth'
 import { displayColor } from '../theme/categoryColor'
 import { useTheme } from '../theme/useTheme'
-import { Spiral } from './Spiral'
 
 interface CategorySpinnerProps {
   categories: Category[]
@@ -35,11 +34,6 @@ const CONTAINER_WIDTH = 560
 // sooner instead, which is the smaller cost.
 const CONTAINER_HEIGHT = 620
 const CONTAINER_HEIGHT_CSS = `min(${CONTAINER_HEIGHT}px, 65vh)`
-// Every rendered label's `right` offset falls in [63.5, 204] (the range
-// LABEL_GAP + RADIUS*cos(angle) produces across the visible diffs) and the
-// dot sits at RADIUS-16=154 — so a square this size tucked flush against
-// the container's own right edge never overlaps either, at any rotation.
-const SPIRAL_SIZE = 56
 // Extra push past RADIUS so labels clear the dot with visible daylight
 // between them, instead of the label's edge sitting right up against it.
 const LABEL_GAP = 34
@@ -142,10 +136,6 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
   // "active" — keeps the dot's color in lockstep with onActiveChange.
   const activeIndex = Math.round(position)
   const activeColor = displayColor(slots[activeIndex].color, theme)
-  // How far along the whole discrete run the spinner has gone — 0 at Home,
-  // 1 at the last category. Unlike the old wraparound version this never
-  // resets on its own; it's a progress bar for the run, not a lap counter.
-  const progress = count > 1 ? position / (count - 1) : 0
 
   return (
     <>
@@ -185,10 +175,6 @@ export function CategorySpinner({ categories, activeSlug, onActiveChange }: Cate
             maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
           }}
         >
-          <div className="absolute top-1/2 right-1 -translate-y-1/2" style={{ width: SPIRAL_SIZE, height: SPIRAL_SIZE }}>
-            <Spiral progress={progress} color={activeColor} />
-          </div>
-
           {/* Sits well clear of the selected label's right edge (LABEL_GAP is
               the same distance that pushes labels away from the dot below) —
               both anchor from the same radius, so without real separation

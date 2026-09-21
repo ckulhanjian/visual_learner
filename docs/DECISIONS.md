@@ -262,22 +262,22 @@ text stayed centered but the grid below it went left-aligned at `lg`,
 reasoning that a grid capped at `max-w-3xl` centered under a `max-w-xl`
 hero would look arbitrarily offset either way. Feedback reversed this: the
 hero text centers in the workspace at every width (no `lg:text-left`
-override), and **the top-3 preview grid now fills the workspace's full
-width** (`w-full`, no `max-w-3xl` cap) rather than being capped and
-left-aligned — both read as "centered/sized within this specific box," not
-within the page as a whole, which is what the workspace column actually is.
-Tiles get genuinely large on a wide screen as a direct consequence, which is
-the point, not a side effect to guard against.
+override). The grid's own width and position went through two more rounds
+after that — first filling the workspace's full width to read as
+"centered/sized within this specific box" (`w-full`, no `max-w-3xl` cap,
+same center as the hero above it), then explicitly shifted off that center:
+`ml-[20%] w-4/5`, a flat "move it right" that intentionally gives up
+matching the hero's center in exchange for the grid reading as more
+deliberately offset rather than dead-centered. Tiles are still genuinely
+large as a result of the width change, which was always the point of that
+part, independent of where the block sits horizontally.
 
-A brief `mt-6 pl-6/pl-10` on the grid (nudging it down and right of the
-hero) turned out to be the wrong tool once centering the grid with the hero
-came up explicitly: one-sided padding shifts a `w-full` element's visible
-content off-center from its own box (the padding eats space on the left
-only), which is exactly what broke the earlier "the grid should read as
-centered under the hero" intent. Removed — see the two-position hero below,
-which handles "the grid sits lower" a different way, and plain `w-full`
-(no side padding) keeps the grid's center exactly matching the hero's,
-since both are centered/sized against the same box.
+A brief `mt-6 pl-6/pl-10` on the grid, in between those two, turned out to
+be the wrong tool for a similar-sounding ask: one-sided padding shifts a
+`w-full` element's visible content off-center from its own box (the
+padding eats space on the left only) rather than actually moving the
+element, which is a different thing from the margin-based shift that
+replaced it. Superseded, not layered on top of.
 
 **The hero has two positions, not one, and HOME_CATEGORY (see above) is
 what switches between them.** While it's the active slot — nothing "really"
@@ -323,7 +323,12 @@ either, per above.
 title/summary text below), and CSS grid's default `align-items: stretch`
 already sizes every cell in the row to match the tallest one, so the fix
 for "line the text up with the bottom of the cards" was bottom-aligning
-this cell's own content, not fighting the grid for height.
+this cell's own content, not fighting the grid for height. It also dropped
+`items-center`: a visual card's title/summary starts flush against its own
+cell's left edge, so centering this button horizontally made it float out
+of step with them rather than reading as the row's 4th member. Default
+(`stretch`) cross-axis alignment lets the button fill the cell's width, so
+its own left-aligned text lands at that same left edge instead.
 
 `VisualPreviewCard` scales up on hover (with a shadow and a higher
 `z-index` so it doesn't get covered by its grid neighbors) — the point is to
@@ -339,45 +344,24 @@ never moves. Transition duration scales with distance
 (`overflowPx / 30` seconds, floored at 0.5s) so a long title and a short one
 read as the same scroll *speed* rather than the same duration.
 
-**`Spiral`** (`components/Spiral.tsx`) draws behind the spinner's labels,
-tinted to the active category's color, filling in as `position` advances
-through the discrete run: `progress = position / (slots.length - 1)`, 0 at
-`HOME_CATEGORY` and reaching 1 at the last real category. Unlike the old
-wraparound spinner this never resets on its own — there's no lap to
-complete, so it reads as a progress indicator for the run rather than an
-animation that loops.
-
-It went through two earlier versions this replaced outright, not
-incrementally patched, each superseded by later feedback rather than kept
-around behind a flag:
-
-1. A **Fibonacci-squares construction** (quarter-circle arcs chained
-   through squares sized by the Fibonacci sequence) — abandoned once
-   feedback asked for "just...a spiral," not a golden-ratio shape tied to
-   a specific mathematical sequence.
-2. A **pixel/ascii-art rasterization** of that curve (`computePixelPath`, a
-   detached `<path>` walked with `getPointAtLength` and bucketed into grid
-   cells, rendered as small `<rect>`s) — abandoned once feedback asked for
-   "a circle spiral, not pixel dots," reversing the earlier ask for a
-   blocky read.
-
-`Spiral` is neither: a plain **Archimedean spiral** (radius grows linearly
-with angle, `r = t * MAX_RADIUS`, `θ = t * TURNS * 2π`), matching a
-hand-drawn reference image of concentric loops. No SVG primitive expresses
-that curve directly (arcs are circular, not spiral), so it's a dense
-polyline — enough samples (140, ~2.75 turns) that individual segments don't
-read as facets at the size it's rendered — revealed with the same
-`pathLength="1"` + `stroke-dashoffset` technique as its predecessors, since
-that part of the mechanism was never the problem.
-
-**Tucked into the one strip of the listbox no label or the dot ever
-reaches**, not centered behind them. Every rendered label's `right` offset
-(`LABEL_GAP` + `RADIUS * cos(angle)` across the visible diffs) falls in
-roughly `[63.5, 204]`, and the dot sits at `RADIUS - 16 = 154` — so
-`right: 0` to `~60` is dead space at every rotation. `SPIRAL_SIZE` (56)
-and its position (`right-1`) fit inside that strip — an earlier, much
-larger version sat centered behind the dot and active label instead, the
-one spot guaranteed to always have something else on top of it.
+**The decorative spinner spiral is gone — removed outright, not replaced
+again.** It went through three versions across three rounds of feedback (a
+Fibonacci-squares construction of chained quarter-circle arcs; a
+pixel/ascii-art rasterization of that same curve into a grid of small
+squares; a plain Archimedean spiral, `components/Spiral.tsx`, matching a
+hand-drawn reference image), each superseded outright rather than kept
+behind a flag, before the final round asked for it to simply not be there.
+`CategorySpinner` no longer imports or renders anything in that spot; the
+dot marker and labels are unaffected, since the spiral only ever drew
+*behind* them. If a decorative element goes there again, it starts from
+this history rather than re-discovering it: whatever shape it takes, tuck
+it into the one strip of the listbox no label or the dot ever reaches —
+every rendered label's `right` offset (`LABEL_GAP` + `RADIUS * cos(angle)`
+across the visible diffs) falls in roughly `[63.5, 204]`, and the dot sits
+at `RADIUS - 16 = 154`, so `right: 0` to `~60` is dead space at every
+rotation. Every earlier version's real bug was sitting somewhere else in
+the box instead — centered behind the dot and active label, the one spot
+guaranteed to always have something else on top of it.
 
 ---
 
