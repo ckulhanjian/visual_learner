@@ -252,7 +252,7 @@ instead of forcing one into multipart encoding it does not need.
 | `/c/:slug` | category name + blurb, 3-column grid of every published visual | `GET /categories/:slug` |
 | `/v/:slug` | full-bleed visual, expand toggle, metadata and notes below | `GET /visuals/:slug` |
 | `/inspo` | a Pinterest board of sample visualizations, embedded | none — Pinterest's own widget |
-| `/submit` | ConceptForm + upload or paste | `GET /categories`, `GET /tags`, `GET /meta`, `POST /visuals` |
+| `/submit` | ConceptForm + upload or paste | `GET /categories`, `GET /meta`, `POST /uploads`, `POST /visuals` |
 | `/create` | *deferred with Vega* — editor, live preview, same ConceptForm | as submit |
 | `/review` | *proposed* — pending queue with publish/archive | `GET /visuals?status=pending` |
 
@@ -317,8 +317,10 @@ Every category as an embedded chart to pick from, on its own page —
 `CategoryBubbleChart`, backed by one `GET /categories` call. Each category
 renders as a circle sized by its published-visual count (`bubbleSize`,
 same linear interpolation `CategoryTreeNav` uses), outlined in the
-category's own subway color with no fill, name and count in white text
-inside it. Bubbles are packed into a bounded frame within the page (20%
+category's own subway color with no fill, name and count in the page's
+own ink color (`text-ink`, the same CSS variable everything else reads —
+not a literal white, which read fine in dark mode but was nearly
+invisible in light, see `docs/DECISIONS.md`). Bubbles are packed into a bounded frame within the page (20%
 whitespace left/right, 5% top, 10% bottom) via a small circle-packing
 relaxation, not laid out in a grid — a tightly clustered arrangement, but
 never touching or overlapping, either at rest, while gently floating
@@ -386,11 +388,37 @@ sandbox rule doesn't apply. The board URL comes from `VITE_PINTEREST_BOARD_URL`
 hardcoded/guessed URL; unset, the page shows a plain "not configured yet"
 message instead of a broken embed.
 
+### `/submit`
+
+`ConceptForm` plus a write-key input `SubmitPage` owns itself (an auth
+concern of the submission action, not a metadata field — see
+`docs/DECISIONS.md`) — built now; `/create` will mount the same
+`ConceptForm` later, per below.
+
 ### ConceptForm
 
 One component owning every metadata field, mounted by both `/submit` and, later,
 `/create`. Both POST the same payload shape to the same endpoint, validated by one
 schema. Adding a field later means editing one file and it appears in both places.
+
+Every dropdown (kind, theme affinity, origin, context, resource kind) is
+built from `GET /meta` — never a hardcoded option list (CLAUDE.md). The
+source input changes shape with `kind`: a file picker for `image` (uploaded
+via `POST /uploads` first, its `asset_path` folded into the create payload
+right before submit), a textarea with a kind-appropriate placeholder for
+everything else. Tags are free text, comma-separated — "Tags deduplicate on
+slug, created on demand" (`docs/DECISIONS.md`) is exactly what makes this
+safe; there's no need to fetch `GET /tags` first to populate a picker.
+Resources are a repeatable label/url/kind row group, added and removed
+freely before submit.
+
+On success the form shows a link to the new visual's `/v/:slug` and resets
+— but not entirely: category, kind, theme affinity, origin, and context
+carry over to the next submission, since seeding is usually several
+visuals of the same kind going into the same category in one sitting, and
+re-picking those every time would be pure friction. A field-level 422
+(Marshmallow's own validation) shows next to the field it's about, read
+off `ApiError.details` rather than just the one summary message.
 
 ---
 
@@ -401,7 +429,9 @@ src/
   api/          one module per endpoint group; only place fetch appears
                 (categories.ts's fetchCategoryDetail and visuals.ts's
                 fetchVisualsByCategory share one DTO->domain mapping,
-                toVisualCard, exported from visuals.ts)
+                toVisualCard, exported from visuals.ts; meta.ts wraps
+                GET /meta). client.ts's apiPost/apiUpload both take an
+                optional write key, sent as X-Atlas-Key only when non-empty
   domain/       Visual (also Resource, VisualDetail — the full /v/:slug
                 shape, a separate class from VisualCard rather than a
                 superset, since the two pages that use them genuinely want
@@ -416,7 +446,9 @@ src/
                 the category picker switched to a bubble chart
                 (docs/DECISIONS.md); the backend model and endpoint
                 are untouched, just not called from here any more.
-  hooks/        small hooks shared across components (useIsDesktopWidth)
+  hooks/        small hooks shared across components (useIsDesktopWidth,
+                useWriteKey — persists the write key the same way
+                theme/useTheme.ts persists the theme choice)
   renderers/    svg.tsx, svgDataUri.ts (the shared data-URI helper —
                 VisualPreviewCard's own thumbnail uses it too), image.tsx,
                 sandboxedIframe.tsx (d3/html/p5, one file since they share
@@ -426,7 +458,8 @@ src/
                 CategoryAsciiArt, VisualPreviewCard, ExpandCell, SiteHeader,
                 SiteFooter, MarkdownBody
   pages/        one file per route, mostly composing the above (Home,
-                CategoriesPage, CategoryPage, VisualPage, InspoPage)
+                CategoriesPage, CategoryPage, VisualPage, InspoPage,
+                SubmitPage)
   theme/        tokens, subway palette, dark mode, categoryColor (dark-mode
                 lightening of category colors for text)
 ```

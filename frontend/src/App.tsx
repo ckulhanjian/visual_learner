@@ -3,6 +3,7 @@ import { CategoriesPage } from './pages/CategoriesPage'
 import { CategoryPage } from './pages/CategoryPage'
 import { Home } from './pages/Home'
 import { InspoPage } from './pages/InspoPage'
+import { SubmitPage } from './pages/SubmitPage'
 import { VisualPage } from './pages/VisualPage'
 
 // A second page (per docs/ARCHITECTURE.md's five routes) now exists, so the
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/c/:slug" element={<CategoryPage />} />
         <Route path="/v/:slug" element={<VisualPage />} />
         <Route path="/inspo" element={<InspoPage />} />
+        <Route path="/submit" element={<SubmitPage />} />
       </Routes>
     </BrowserRouter>
   )

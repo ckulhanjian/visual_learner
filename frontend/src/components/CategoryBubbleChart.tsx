@@ -181,8 +181,11 @@ function packBubbles(categories: Category[], width: number, height: number): Pla
 // An embedded chart, not a menu: every category clustered into one bounded
 // frame, sized by its published-visual count, clicking one goes straight
 // to its page (/c/:slug). No fill — outline only, in the category's own
-// subway color — and white text, per feedback on the fill/pastel version
-// this replaced (see docs/DECISIONS.md).
+// subway color — and text in the page's own ink color (`text-ink`, a CSS
+// variable that already flips with `data-theme` — see tokens.css), not a
+// literal white: white read fine in dark mode but was nearly invisible on
+// the light-theme cream background, a known limit flagged when the
+// original literal-white feedback was implemented (see docs/DECISIONS.md).
 export function CategoryBubbleChart({ categories }: CategoryBubbleChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -232,8 +235,8 @@ export function CategoryBubbleChart({ categories }: CategoryBubbleChartProps) {
               className="flex h-full w-full flex-col items-center justify-center gap-1 rounded-full border-2 text-center transition-transform hover:z-10 hover:scale-105"
               style={{ borderColor: category.color }}
             >
-              <span className="font-mono text-xs font-bold break-words text-white">{category.name}</span>
-              <span className="font-mono text-[11px] text-white opacity-70">{category.publishedCount}</span>
+              <span className="text-ink font-mono text-xs font-bold break-words">{category.name}</span>
+              <span className="text-ink font-mono text-[11px] opacity-70">{category.publishedCount}</span>
             </Link>
           </div>
         )

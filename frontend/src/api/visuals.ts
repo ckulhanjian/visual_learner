@@ -1,5 +1,5 @@
 import { Resource, VisualCard, VisualDetail, type VisualCategoryRef } from '../domain/Visual'
-import { apiGet } from './client'
+import { apiGet, apiPost } from './client'
 
 // The wire shape of a VisualCardSchema dump (snake_case) — kept private to
 // this module. Exported as a type so api/categories.ts (whose
@@ -55,8 +55,7 @@ interface VisualDetailDTO extends VisualCardDTO {
   resources: ResourceDTO[]
 }
 
-export async function fetchVisualDetail(slug: string): Promise<VisualDetail> {
-  const dto = await apiGet<VisualDetailDTO>(`/visuals/${encodeURIComponent(slug)}`)
+function toVisualDetail(dto: VisualDetailDTO): VisualDetail {
   return new VisualDetail({
     slug: dto.slug,
     title: dto.title,
@@ -77,4 +76,68 @@ export async function fetchVisualDetail(slug: string): Promise<VisualDetail> {
     tags: dto.tags,
     resources: dto.resources.map((resource) => new Resource(resource)),
   })
+}
+
+export async function fetchVisualDetail(slug: string): Promise<VisualDetail> {
+  const dto = await apiGet<VisualDetailDTO>(`/visuals/${encodeURIComponent(slug)}`)
+  return toVisualDetail(dto)
+}
+
+export interface NewResourceDraft {
+  label: string
+  url: string
+  kind: string
+}
+
+// ConceptForm's own draft shape — camelCase, matching every other domain
+// type here, mapped to VisualCreateSchema's snake_case payload only at the
+// point of sending it. Not a class: this is transient form state (CLAUDE.md's
+// "OOP in the domain/service layers" is about the entities the API returns,
+// not a form's own working copy of one that doesn't exist yet).
+export interface NewVisualDraft {
+  title: string
+  kind: string
+  source: string
+  assetPath: string | null
+  themeAffinity: string
+  origin: string
+  generator: string
+  createdOn: string
+  context: string
+  course: string
+  summaryMd: string
+  notesMd: string
+  categorySlug: string
+  tags: string[]
+  resources: NewResourceDraft[]
+}
+
+// `POST /visuals` is open (docs/ARCHITECTURE.md §5) — `writeKey` is what
+// decides queued-vs-live (an anonymous request lands `pending`), not
+// whether the request is allowed at all. Returns the created visual's own
+// detail shape, same as `fetchVisualDetail` — the response already carries
+// whatever slug the backend generated from the title.
+export async function createVisual(draft: NewVisualDraft, writeKey: string | undefined): Promise<VisualDetail> {
+  const dto = await apiPost<VisualDetailDTO>(
+    '/visuals',
+    {
+      title: draft.title,
+      kind: draft.kind,
+      source: draft.source,
+      asset_path: draft.assetPath,
+      theme_affinity: draft.themeAffinity,
+      origin: draft.origin,
+      generator: draft.generator || null,
+      created_on: draft.createdOn || null,
+      context: draft.context,
+      course: draft.course || null,
+      summary_md: draft.summaryMd,
+      notes_md: draft.notesMd,
+      category_slug: draft.categorySlug,
+      tags: draft.tags,
+      resources: draft.resources.map((resource) => ({ label: resource.label, url: resource.url, kind: resource.kind })),
+    },
+    writeKey,
+  )
+  return toVisualDetail(dto)
 }

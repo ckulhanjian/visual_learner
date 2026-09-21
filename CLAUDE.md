@@ -18,7 +18,7 @@ submit is visible until it is reviewed.
 | | |
 |---|---|
 | Backend | Flask + SQLAlchemy + Marshmallow, SQLite. |
-| Frontend | React + TypeScript + Vite + Tailwind v4. `react-router-dom` for the five routes that exist: `/` (spinner, theme, layout), `/categories` (every category as an embedded bubble chart), `/c/:slug` (a category's full visual list), `/v/:slug` (one visual, full template), and `/inspo` (a Pinterest board embed) — `/submit` and `/create` aren't built. Plain HTML/JS test page (`frontend-test/`) still around for raw API poking. |
+| Frontend | React + TypeScript + Vite + Tailwind v4. `react-router-dom` for the six routes that exist: `/` (spinner, theme, layout), `/categories` (every category as an embedded bubble chart), `/c/:slug` (a category's full visual list), `/v/:slug` (one visual, full template), `/inspo` (a Pinterest board embed), and `/submit` (ConceptForm) — only `/create` isn't built. Plain HTML/JS test page (`frontend-test/`) still around for raw API poking. |
 | Deferred | Vega-Lite and the `/create` editor page, p5.js, Chart.js/vega renderers, Postgres, Alembic. |
 
 ## Commands
@@ -112,19 +112,22 @@ Do not weaken these without an explicit decision recorded in `docs/DECISIONS.md`
   count, colored per category, hover one to preview its visuals on the
   right, click one to go to its page) and, on click, goes to its own
   dedicated page (`/categories`) showing every category as a larger
-  embedded bubble chart — outlined circles, no fill, white text, tightly
-  clustered inside a bounded frame but never touching or overlapping, at
-  rest, on hover, or while gently floating (see below). The spinner never
-  navigates by itself — "See more" on the home page's preview grid is its
-  one link into a category's full page (`/c/:slug`), and each visual card
-  in that grid (or a category page's own grid) links to that visual's own
-  page (`/v/:slug`). The header logo itself carries you from a category or
-  visual page back home, landing the spinner on that category rather than
-  the unselected state; a category page's own small "← All Categories"
-  line (above its title, left-justified with it) is a separate link, to
-  `/categories` instead. While a category page is open, the header link
-  reads "Category: <name>" instead of "Categories." A third header link,
-  "Inspo," goes to a Pinterest board embed (`/inspo`) — see
+  embedded bubble chart — outlined circles, no fill, text in the page's own
+  ink color (so it stays legible in both themes — a literal white was
+  fine in dark mode but nearly invisible in light, a known limit until this
+  was fixed), tightly clustered inside a bounded frame but never touching
+  or overlapping, at rest, on hover, or while gently floating (see below).
+  The spinner never navigates by itself — "See more" on the home page's
+  preview grid is its one link into a category's full page (`/c/:slug`),
+  and each visual card in that grid (or a category page's own grid) links
+  to that visual's own page (`/v/:slug`). The header logo itself carries
+  you from a category or visual page back home, landing the spinner on
+  that category rather than the unselected state; a category page's own
+  small "← All Categories" line (above its title, left-justified with it)
+  is a separate link, to `/categories` instead. While a category page is
+  open, the header link reads "Category: <name>" instead of "Categories."
+  Two more header links: "Inspo," a Pinterest board embed (`/inspo`), and
+  "Submit," the ConceptForm submission page (`/submit`) — see
   `docs/DECISIONS.md`.
 - **The logo is set in the same italic EB Garamond as the hero title**, not
   the mono/uppercase treatment other header chrome uses — it reads as part

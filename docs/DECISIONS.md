@@ -956,6 +956,85 @@ script only auto-scans once, on its own load, so arriving at `/inspo` by
 client-side navigation after an earlier page view already loaded it would
 otherwise leave the embed anchor as plain unbuilt text.
 
+**Confirmed, when asked directly: no, a plain `<iframe src="pinterest.com/...">`
+won't work.** Pinterest's own pages send frame-busting headers
+(`X-Frame-Options`/CSP `frame-ancestors`) that block third-party framing —
+that's exactly *why* Pinterest ships the `pinit.js` widget in the first
+place, as the sanctioned way to embed a board without being able to iframe
+the page directly. `/inspo` already used that widget, so no code changed
+here; this is a decision record of the answer, not a fix.
+
+**Categories page bubble text: `text-ink`, not a literal `text-white`.**
+Flagged as a known limit when the literal-white version shipped (white
+read fine in dark mode, nearly invisible against the light-theme cream
+background) and revisited once asked directly. `text-ink` is the same CSS
+variable every other themed color on this site reads — it already flips
+with `data-theme` (`tokens.css`), so this needed no `theme`-conditional JS
+branch the way `displayColor`/`pastelize` need one for colors that don't
+have a ready-made variable; a plain Tailwind class was enough here because
+`--color-ink` already *is* that per-theme value.
+
+### `/submit` is built
+
+The last concrete ask: "lets add the page to create new visuals so I can
+start seeding data." `ConceptForm` (docs/ARCHITECTURE.md had already named
+it, unbuilt, as the component `/submit` and `/create` would eventually
+share) now exists for real, needing no backend changes — `POST /visuals`,
+`POST /uploads`, and `GET /meta` were all already implemented and already
+correct for this; the gap was entirely a missing frontend page.
+
+**The write key lives on `SubmitPage`, not inside `ConceptForm`.** It's not
+a field on the visual being created — it's how the *request* authenticates
+itself, same category as an HTTP header, not a domain property. Keeping it
+out of `ConceptForm` also keeps that component honestly reusable for
+`/create` later without dragging an auth concern along with it.
+`useWriteKey` persists it in `localStorage` the same way `theme/useTheme.ts`
+persists the theme choice (same reasoning: a single-operator personal
+site, so remembering it locally saves re-typing it for every visual added
+in one seeding session — never sent anywhere but this site's own API).
+
+**Every dropdown comes from `GET /meta`, not a hardcoded list** — kind,
+theme affinity, origin, context, resource kind — "one definition per
+concept" (CLAUDE.md): the form can't offer a value the backend would
+reject because it never invents the list of values in the first place.
+
+**Tags are still free text — no `GET /tags` call for a picker.** "Tags
+deduplicate on slug, created on demand" (§3 below) already makes free text
+safe: typos or near-duplicates land on the same tag by slug regardless,
+so there's no correctness reason to constrain input to existing tags, and
+building an autocomplete against `GET /tags` would be new frontend work
+solving a problem the backend already solves.
+
+**The source input's shape follows `kind` — a file picker only for
+`image`, a placeholder-hinted textarea for everything else.** `image` is
+the one kind whose `source` field isn't actually used (per
+`docs/ARCHITECTURE.md`'s data model, `source` is "empty for image"); its
+real content is a file, uploaded via `POST /uploads` right before the
+`POST /visuals` call, with the returned `asset_path` folded into the same
+payload the other kinds send `source` in. Every other kind gets a plain
+textarea — no kind-specific editor (a JSON editor for `chartjs`, a code
+editor with syntax highlighting for `d3`/`html`/`p5`) yet; a placeholder
+string per kind is the one piece of per-kind guidance offered, enough to
+get seeding started without building an editor for every renderer up
+front.
+
+**The form resets after a successful submit, but only partway.** Category,
+kind, theme affinity, origin, and context carry over to the next
+submission; title, source, summary, notes, tags, and resources clear.
+Seeding is naturally batched — several visuals of the same kind going into
+the same category in one sitting — so keeping the fields that are usually
+the same and clearing the fields that are always different matches how
+the form actually gets used, rather than forcing every field to be
+re-picked or manually cleared each time.
+
+**Field-level errors read `ApiError.details`, not just the summary
+message.** `ApiError` gained a `details` field (populated from the error
+envelope's own `details`, which is exactly where Marshmallow's per-field
+messages already land — `docs/ARCHITECTURE.md` §5) — every other
+`ApiError` throw site in the app already ignored this and just showed
+`message`, which was fine for a single generic error banner but not for a
+form with a dozen fields, where "which one" matters as much as "what."
+
 ---
 
 ## 2. Visualization libraries

@@ -91,6 +91,12 @@ export function SiteHeader({ theme, onToggleTheme, activeCategoryName, onLogoCli
         >
           Inspo
         </Link>
+        <Link
+          to="/submit"
+          className="text-ink/70 hover:text-ink hover:border-ink/40 border-line rounded-full border px-3 py-1.5 font-mono text-xs tracking-wide uppercase transition-colors"
+        >
+          Submit
+        </Link>
       </div>
       <ThemeToggle theme={theme} onToggle={onToggleTheme} />
     </header>
