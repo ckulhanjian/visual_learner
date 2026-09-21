@@ -15,7 +15,18 @@ const MAX_BUBBLE = 200
 const MARGIN_X = 0.2
 const MARGIN_TOP = 0.05
 const MARGIN_BOTTOM = 0.1
-const RELAXATION_PASSES = 200
+const RELAXATION_PASSES = 800
+// The Link's own `hover:scale-105` grows a bubble by 5% on hover — packing
+// has to leave enough breathing room that a grown bubble still can't touch
+// its neighbor, not just enough for the bubbles at rest. A little more
+// than 1.05 so they clear each other with margin to spare, not exactly meet.
+const HOVER_SAFETY_FACTOR = 1.12
+// If a full relaxation still leaves an overlap (the margin box just isn't
+// big enough for every bubble at its natural size — a narrow viewport),
+// shrink every bubble and try again rather than shipping bubbles that
+// touch or overlap.
+const MAX_SHRINK_ATTEMPTS = 6
+const SHRINK_FACTOR = 0.88
 
 // Diameter scales with how many published visuals a category has — the
 // point of "bubbles," not a fixed grid of same-size circles. A category
@@ -40,38 +51,29 @@ function clamp(value: number, lo: number, hi: number): number {
   return lo <= hi ? Math.min(Math.max(value, lo), hi) : (lo + hi) / 2
 }
 
-// A minimal circle-packing relaxation — no d3-force dependency (deferred,
-// per docs/ARCHITECTURE.md). Bubbles seed along a golden-angle spiral
-// (biggest nearest center, matching the Pareto-cluster reference this
-// design was asked for), then get nudged apart pairwise wherever they
-// overlap and clamped back inside the margin box every pass. Enough
-// passes settles into a tight, mostly non-overlapping cluster; a box this
-// restricted still leaves some overlap where there simply isn't room —
-// that's the "layered" look, not a bug in the relaxation.
-function packBubbles(categories: Category[], width: number, height: number): Placement[] {
-  const maxCount = Math.max(0, ...categories.map((category) => category.publishedCount))
-  const minX = width * MARGIN_X
-  const maxX = width * (1 - MARGIN_X)
-  const minY = height * MARGIN_TOP
-  const maxY = height * (1 - MARGIN_BOTTOM)
-  const centerX = (minX + maxX) / 2
-  const centerY = (minY + maxY) / 2
-  const spreadX = Math.max(1, (maxX - minX) / 2)
-  const spreadY = Math.max(1, (maxY - minY) / 2)
-
-  const sorted = [...categories].sort((a, b) => b.publishedCount - a.publishedCount)
-  const goldenAngle = Math.PI * (3 - Math.sqrt(5))
-  const points = sorted.map((category, i) => {
-    const radius = Math.sqrt((i + 0.5) / sorted.length)
-    const angle = i * goldenAngle
-    return {
-      category,
-      size: bubbleSize(category.publishedCount, maxCount),
-      x: centerX + radius * spreadX * Math.cos(angle),
-      y: centerY + radius * spreadY * Math.sin(angle),
+// True while any pair is closer than `HOVER_SAFETY_FACTOR` times the sum of
+// their radii — the check a plain relaxation pass can't answer for itself,
+// since "no pair moved this pass" and "no pair overlaps" aren't the same
+// thing when passes run out early.
+function hasOverlap(points: Placement[]): boolean {
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      const a = points[i]
+      const b = points[j]
+      const distance = Math.hypot(b.x - a.x, b.y - a.y)
+      const minDistance = ((a.size + b.size) / 2) * HOVER_SAFETY_FACTOR
+      if (distance < minDistance - 0.5) return true
     }
-  })
+  }
+  return false
+}
 
+// Nudges every overlapping pair apart along the line between their
+// centers and clamps each bubble back inside the margin box, repeated
+// until stable (or out of passes). `HOVER_SAFETY_FACTOR` on the minimum
+// distance means "stable" already accounts for the hover-grown size, not
+// just the resting one.
+function relax(points: Placement[], minX: number, maxX: number, minY: number, maxY: number): void {
   for (let pass = 0; pass < RELAXATION_PASSES; pass++) {
     let moved = false
     for (let i = 0; i < points.length; i++) {
@@ -81,7 +83,7 @@ function packBubbles(categories: Category[], width: number, height: number): Pla
         const dx = b.x - a.x
         const dy = b.y - a.y
         const distance = Math.hypot(dx, dy) || 0.01
-        const minDistance = (a.size + b.size) / 2
+        const minDistance = ((a.size + b.size) / 2) * HOVER_SAFETY_FACTOR
         if (distance < minDistance) {
           moved = true
           const overlap = (minDistance - distance) / 2
@@ -99,6 +101,48 @@ function packBubbles(categories: Category[], width: number, height: number): Pla
       point.y = clamp(point.y, minY + point.size / 2, maxY - point.size / 2)
     }
     if (!moved) break
+  }
+}
+
+// A minimal circle-packing relaxation — no d3-force dependency (deferred,
+// per docs/ARCHITECTURE.md). Bubbles seed along a golden-angle spiral
+// (biggest nearest center, matching the Pareto-cluster reference this
+// design was asked for), then get nudged apart pairwise and clamped back
+// inside the margin box until nothing overlaps — including at the hover
+// size, not just at rest (see `HOVER_SAFETY_FACTOR`). If the margin box is
+// too small for every bubble to fit at its natural size, every bubble
+// shrinks by `SHRINK_FACTOR` and the relaxation runs again, rather than
+// shipping a layout where bubbles touch or overlap.
+function packBubbles(categories: Category[], width: number, height: number): Placement[] {
+  const maxCount = Math.max(0, ...categories.map((category) => category.publishedCount))
+  const minX = width * MARGIN_X
+  const maxX = width * (1 - MARGIN_X)
+  const minY = height * MARGIN_TOP
+  const maxY = height * (1 - MARGIN_BOTTOM)
+  const centerX = (minX + maxX) / 2
+  const centerY = (minY + maxY) / 2
+  const spreadX = Math.max(1, (maxX - minX) / 2)
+  const spreadY = Math.max(1, (maxY - minY) / 2)
+
+  const sorted = [...categories].sort((a, b) => b.publishedCount - a.publishedCount)
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5))
+
+  let points: Placement[] = []
+  let scale = 1
+  for (let attempt = 0; attempt < MAX_SHRINK_ATTEMPTS; attempt++) {
+    points = sorted.map((category, i) => {
+      const radius = Math.sqrt((i + 0.5) / sorted.length)
+      const angle = i * goldenAngle
+      return {
+        category,
+        size: bubbleSize(category.publishedCount, maxCount) * scale,
+        x: centerX + radius * spreadX * Math.cos(angle),
+        y: centerY + radius * spreadY * Math.sin(angle),
+      }
+    })
+    relax(points, minX, maxX, minY, maxY)
+    if (!hasOverlap(points)) break
+    scale *= SHRINK_FACTOR
   }
 
   return points

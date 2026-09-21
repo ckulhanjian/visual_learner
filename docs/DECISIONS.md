@@ -352,21 +352,54 @@ outline/shadow behind the label.
 **The header hover dropdown came back, alongside the `/categories` page,
 not instead of it.** Feedback after the above: "when you hover on
 categories button, show the dropdown like before (same hover effects)."
-`CategoryTreeNav.tsx` is restored close to its pre-deletion form — same
-pastel fill, same grey hover-backdrop circle, same hover-a-bubble-to-
-preview-its-visuals pane — with one change: it now opens on hovering the
-header's "Categories" link itself (`onMouseEnter`/`onMouseLeave` on the
-wrapping container) instead of a click that toggled `open` state, so
-browsing doesn't cost a click just to see it. The link inside stays a real
-`Link` to `/categories`, so clicking it (rather than a bubble) goes to the
-dedicated page instead of doing nothing. `SiteHeader` fetches `categories`
-again to hand to it, same as before the dropdown was deleted — falling
-back to a plain link to `/categories` while that fetch is loading or
-failed, so the header never has nothing to click. Two surfaces doing
-overlapping jobs (a quick hover preview vs. a full clustered page) was a
-deliberate answer to the ask, not an oversight: the dropdown is for a
-glance without leaving the page, the page is the "embedded chart" asked
-for two rounds ago — neither replaces the other now.
+`CategoryTreeNav.tsx` is restored, opening on hovering the header's
+"Categories" link itself (`onMouseEnter`/`onMouseLeave` on the wrapping
+container) instead of a click that toggled `open` state, so browsing
+doesn't cost a click just to see it — and hovering an entry inside it (not
+clicking) still shows that category's visuals in a pane on the right, same
+as before. The link inside stays a real `Link` to `/categories`, so
+clicking it (rather than an entry) goes to the dedicated page instead of
+doing nothing. `SiteHeader` fetches `categories` again to hand to it, same
+as before the dropdown was deleted — falling back to a plain link to
+`/categories` while that fetch is loading or failed, so the header never
+has nothing to click. Two surfaces doing overlapping jobs (a quick hover
+preview vs. a full clustered page) was a deliberate answer to the ask, not
+an oversight: the dropdown is for a glance without leaving the page, the
+page is the "embedded chart" asked for two rounds ago — neither replaces
+the other now.
+
+**The dropdown's contents reverted to a plain list, not bubbles — twice
+now, in two rounds.** First restored with the same small pastel-filled
+bubbles and grey hover backdrop the pre-deletion version had. Immediate
+follow-up feedback: "do not display circle, only categories names as a
+list. same as how it was prior." Read as "prior" meaning before bubbles
+existed here at all, not the immediately preceding round —
+`CategoryTreeNav`'s left column is now a plain `<ul>` of category names
+(colored via `displayColor`, with the published count alongside in
+parens), no circle/icon of any kind, no `bubbleSize`/`pastelize` — those
+belong to the bubble chart on `/categories` now, not this dropdown. The
+hover-to-preview-visuals pane on the right is unchanged; only what the
+left column renders changed, since nothing in the feedback asked for that
+pane to go.
+
+**Fixed: the dropdown closing before the pointer reached it.** Reported
+directly: "when i try to hover on categories and then hover on the
+dropdown, the dropdown disappears." The panel was positioned with `mt-2`
+(a margin) below the link, inside a `relative` container whose
+`onMouseEnter`/`onMouseLeave` controlled `open` — but a *margin* creates
+empty space that belongs to neither the link nor the panel, so a straight
+mouse path from one to the other crossed a strip covered by no element at
+all. The container's hoverable area is exactly the union of its
+descendants' boxes; crossing that dead strip counted as leaving the
+container, which fired `onMouseLeave` and closed the dropdown before the
+pointer ever reached the panel. Fixed by moving the visual gap from a
+margin on the panel to `pt-2` padding on a new wrapper directly around it:
+padding is still part of an element's own hit-tested box (only margin
+creates dead space), so the wrapper now sits flush against the link
+(`top-full`, no margin) and the mouse never leaves any element while
+crossing what's visually still an 8px gap. Verified with a Playwright
+script that walks the pointer down in small steps from the link toward
+the panel, asserting the dropdown never disappears mid-path.
 
 **Bubble clustering on `/categories`: a small circle-packing relaxation,
 not a grid.** Feedback: "I want the bubbles to be more clustered and
@@ -388,16 +421,35 @@ from-scratch minimal relaxation: bubbles seed along a golden-angle
 (phyllotaxis) spiral scaled to the box, biggest category nearest center
 (sorted descending by `publishedCount`), then a fixed number of passes
 nudges every overlapping pair apart along the line between their centers
-and clamps every bubble back inside the margin box. Enough passes settles
-into a tight, mostly non-overlapping cluster; because the box is
-deliberately restricted, there usually isn't room for every bubble to
-fully separate — the residual overlap *is* the "layered" look asked for,
-not a bug the relaxation failed to resolve. Bubbles keep their existing
-no-fill/white-text styling from the round above unchanged — this decision
-is about placement, not appearance — so overlapping ones show only
-crossing outlines and each other's own centered label, which stays
-legible because the labels don't share a center even when the circles do
-overlap.
+and clamps every bubble back inside the margin box. Bubbles keep their
+existing no-fill/white-text styling from the round above unchanged — this
+decision is about placement, not appearance.
+
+**Follow-up feedback reversed the "residual overlap is the look" call
+above: "make sure nothing overlaps even on hover (animation to grow)."**
+The first version accepted leftover overlap where 200 relaxation passes
+weren't enough to fully separate everything inside the restricted margin
+box, reading that as the intended "layered" effect the clustering request
+implied. It wasn't — asked to remove outright, including the case the
+first version didn't even consider: bubbles already just touching at rest
+would still overlap the instant `hover:scale-105` grows one by 5%. Fixed
+with three changes to `packBubbles`: (1) the pairwise minimum-distance
+check now multiplies the resting sum-of-radii by `HOVER_SAFETY_FACTOR`
+(1.12, a little past the 5% hover growth so grown bubbles clear each
+other with room to spare, not exactly meet), so "resolved" already accounts
+for the hover state, not just the resting one; (2) a real `hasOverlap`
+check after relaxation replaces trusting "no pair moved this pass" as a
+proxy for "no pair overlaps" — those aren't the same claim if passes run
+out early; (3) when overlap survives a full relaxation (the margin box
+genuinely isn't big enough for every bubble at its natural size — the
+common case on a narrow viewport), every bubble shrinks by `SHRINK_FACTOR`
+(0.88) and the whole relaxation runs again, up to `MAX_SHRINK_ATTEMPTS`
+(6) times, rather than shipping bubbles that touch. Passes per attempt
+also went up (200 → 800) since the extra safety margin means more pairs
+need resolving before the layout stabilizes. Verified with a Playwright
+script measuring the actual on-screen gap between every pair of bubbles —
+at rest, and again while hovering each bubble in turn — asserting every
+gap stays positive.
 
 **Category restructuring (e.g. introducing "Math" as a parent of "Physics")
 is explicitly not decided.** `topics` nest *within* a category; they don't

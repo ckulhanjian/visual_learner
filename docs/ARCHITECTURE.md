@@ -269,14 +269,14 @@ Two nav surfaces, not one:
   See `docs/DECISIONS.md` for the geometry, the column layout, and why it
   isn't real scroll.
 - **`CategoryTreeNav`** — the header's "Categories" hover dropdown: every
-  category as a small bubble, diameter scaled by its published-visual
-  count, backed by `GET /categories`. Opens on hovering the header link
-  itself (not a click), and hovering a bubble inside it (not clicking)
-  shows that category's visuals in a pane on the right
-  (`GET /visuals?category=...`, one request per category, fetched once on
-  first open and cached); clicking a bubble navigates to its page
-  (`/c/:slug`), clicking the header link itself goes to `/categories`
-  (below). No topics here any more — see `docs/DECISIONS.md`.
+  category as a plain name in a list, colored per category, backed by
+  `GET /categories`. Opens on hovering the header link itself (not a
+  click), and hovering a name inside it (not clicking) shows that
+  category's visuals in a pane on the right (`GET /visuals?category=...`,
+  one request per category, fetched once on first open and cached);
+  clicking a name navigates to its page (`/c/:slug`), clicking the header
+  link itself goes to `/categories` (below). No topics here any more —
+  see `docs/DECISIONS.md`.
 
 The page body is two flex columns at `lg`+: the hero text and (once a real
 category is active) the preview grid on the left, the spinner in its own
@@ -310,11 +310,12 @@ same linear interpolation `CategoryTreeNav` uses), outlined in the
 category's own subway color with no fill, name and count in white text
 inside it. Bubbles are packed into a bounded frame within the page (20%
 whitespace left/right, 5% top, 10% bottom) via a small circle-packing
-relaxation, not laid out in a grid — the result is a clustered, often
-overlapping cluster, deliberately, rather than evenly spaced. Clicking one
-navigates straight to `/c/:slug`. See `docs/DECISIONS.md` for the packing
-algorithm and why there's no hover-to-preview pane here (that lives in
-`CategoryTreeNav`'s dropdown instead).
+relaxation, not laid out in a grid — a tightly clustered arrangement, but
+never touching or overlapping, either at rest or while a bubble grows on
+hover. Clicking one navigates straight to `/c/:slug`. See
+`docs/DECISIONS.md` for the packing algorithm and why there's no
+hover-to-preview pane here (that lives in `CategoryTreeNav`'s dropdown
+instead).
 
 ### `/c/:slug`
 
