@@ -175,11 +175,28 @@ export function Home() {
                       visual ? (
                         <VisualPreviewCard key={visual.slug} visual={visual} />
                       ) : (
+                        // Mirrors VisualPreviewCard's own structure (an
+                        // aspect-square area plus a title/summary text
+                        // block below, the latter invisible rather than
+                        // absent) so this cell's natural height always
+                        // matches a real card's — not just its image
+                        // portion. Without the text block, a row mixing
+                        // this with a real (taller) card left it short,
+                        // stranded above where ExpandCell's bottom-aligned
+                        // text landed in that same row.
                         <li
                           key={`empty-${i}`}
-                          className="border-line text-ink-muted flex aspect-square items-center justify-center rounded-lg border border-dashed font-mono text-[10px] uppercase"
+                          className="border-line text-ink-muted flex flex-col overflow-hidden rounded-lg border border-dashed"
                         >
-                          Empty
+                          <div className="flex aspect-square items-center justify-center font-mono text-[10px] uppercase">
+                            Empty
+                          </div>
+                          <div className="min-w-0 p-2">
+                            <p className="invisible font-mono text-xs">Placeholder</p>
+                            <p className="invisible mt-1 line-clamp-2 text-[11px]">
+                              Reserves the same two-line height a real summary would take.
+                            </p>
+                          </div>
                         </li>
                       ),
                     )}

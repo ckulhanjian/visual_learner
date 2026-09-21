@@ -330,6 +330,23 @@ of step with them rather than reading as the row's 4th member. Default
 (`stretch`) cross-axis alignment lets the button fill the cell's width, so
 its own left-aligned text lands at that same left edge instead.
 
+**The "Empty" placeholder mirrors `VisualPreviewCard`'s own structure —
+an `aspect-square` area plus a title/summary text block below it, the
+latter `invisible` rather than absent — instead of being a bare
+`aspect-square` div.** `ExpandCell`'s stretch-to-row-height fix above only
+half-solved the "See all visuals" alignment: it was correct whenever every
+cell in the row was equally short (a category with zero visuals, where all
+three preview slots are `Empty`), but a bare `aspect-square` div doesn't
+stretch — an item with an aspect ratio and a definite width computes its
+own height from that ratio rather than filling a taller grid row — so in a
+*mixed* row (some real cards, one `Empty`), the placeholder stayed pinned
+to its own short square while the row grew to fit the real cards, stranding
+it well above where `ExpandCell`'s bottom-aligned text landed in that same
+row. Giving `Empty` the same two-part shape as a real card, sized by the
+same classes (so the reserved text height stays correct at any column
+width without a hardcoded pixel value), makes its natural height match a
+real card's regardless of what else is in the row — mixed or not.
+
 `VisualPreviewCard` scales up on hover (with a shadow and a higher
 `z-index` so it doesn't get covered by its grid neighbors) — the point is to
 make a genuinely tiny thumbnail (an SVG shrunk into a 1:1 box) briefly
