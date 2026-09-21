@@ -12,7 +12,7 @@ Three layers.
 ```
 React (TypeScript, Vite, Tailwind v4)        :5173
   pages/        five routes, compose only (three built: Home, CategoriesPage, CategoryPage)
-  components/   ConceptForm, CategorySpinner, CategoryBubbleChart, VisualPreviewCard, MarkdownBody
+  components/   ConceptForm, CategorySpinner, CategoryTreeNav, CategoryBubbleChart, VisualPreviewCard, MarkdownBody
   renderers/    one file per kind + the registry
   domain/       Visual, Category, Tag types
   api/          the only place fetch() appears
@@ -268,9 +268,15 @@ Two nav surfaces, not one:
   unsupported). Below `lg` (1024px) it's a plain tap-to-select row instead.
   See `docs/DECISIONS.md` for the geometry, the column layout, and why it
   isn't real scroll.
-- **The header's "Categories" link** — goes to its own page, `/categories`
-  (below), rather than opening a dropdown in place. No topics here any
-  more — see `docs/DECISIONS.md`.
+- **`CategoryTreeNav`** — the header's "Categories" hover dropdown: every
+  category as a small bubble, diameter scaled by its published-visual
+  count, backed by `GET /categories`. Opens on hovering the header link
+  itself (not a click), and hovering a bubble inside it (not clicking)
+  shows that category's visuals in a pane on the right
+  (`GET /visuals?category=...`, one request per category, fetched once on
+  first open and cached); clicking a bubble navigates to its page
+  (`/c/:slug`), clicking the header link itself goes to `/categories`
+  (below). No topics here any more — see `docs/DECISIONS.md`.
 
 The page body is two flex columns at `lg`+: the hero text and (once a real
 category is active) the preview grid on the left, the spinner in its own
@@ -287,9 +293,9 @@ that.
 
 The footer carries a copyright line, a link to the repo, and a one-line
 gloss on the name ("Achk (աչք) is the Armenian word for 'eye.'"). `SiteHeader`
-(logo linking home, a "Categories" link, theme toggle) is shared with every
-other page rather than each one implementing its own copy — that link
-reads "Category: <name>" instead of "Categories" while `/c/:slug`
+(logo linking home, `CategoryTreeNav`, theme toggle) is shared with every
+other page rather than each one implementing its own copy — its dropdown
+link reads "Category: <name>" instead of "Categories" while `/c/:slug`
 is open (an optional prop `CategoryPage` passes once its category has
 loaded), and that page carries a "← Home" link back to `/?category=:slug`
 so the spinner lands back on the category the visitor came from, not the
@@ -297,14 +303,18 @@ unselected `HOME_CATEGORY` slot — see `docs/DECISIONS.md`.
 
 ### `/categories`
 
-Every category as an embedded chart to pick from, on its own page rather
-than a header dropdown — `CategoryBubbleChart`, backed by one `GET
-/categories` call. Each category renders as a circle sized by its
-published-visual count (`bubbleSize`, same linear interpolation as the
-dropdown version it replaced), outlined in the category's own subway
-color with no fill, name and count in white text inside it. Clicking one
-navigates straight to `/c/:slug`. No hover-to-preview pane — see
-`docs/DECISIONS.md` for what that traded away.
+Every category as an embedded chart to pick from, on its own page —
+`CategoryBubbleChart`, backed by one `GET /categories` call. Each category
+renders as a circle sized by its published-visual count (`bubbleSize`,
+same linear interpolation `CategoryTreeNav` uses), outlined in the
+category's own subway color with no fill, name and count in white text
+inside it. Bubbles are packed into a bounded frame within the page (20%
+whitespace left/right, 5% top, 10% bottom) via a small circle-packing
+relaxation, not laid out in a grid — the result is a clustered, often
+overlapping cluster, deliberately, rather than evenly spaced. Clicking one
+navigates straight to `/c/:slug`. See `docs/DECISIONS.md` for the packing
+algorithm and why there's no hover-to-preview pane here (that lives in
+`CategoryTreeNav`'s dropdown instead).
 
 ### `/c/:slug`
 

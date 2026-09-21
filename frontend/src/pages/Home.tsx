@@ -130,10 +130,21 @@ export function Home() {
   }, [isHome, isDesktopWidth])
 
   return (
-    <div className="flex min-h-screen flex-col">
+    // A fixed viewport-height column, not `min-h-screen` — the spinner and
+    // hero's own content can run taller than the viewport on a
+    // short/laptop window, and `min-height` only sets a floor, so the
+    // column grew past 100vh and pushed the footer below the fold. `h-dvh`
+    // pins the whole page to exactly the viewport (accounting for mobile
+    // browser chrome); `main` below absorbs the leftover space and
+    // scrolls internally if its own content still doesn't fit, so the
+    // footer stays visible without scrolling the page to reach it.
+    <div className="flex h-dvh flex-col overflow-hidden">
       <SiteHeader theme={theme} onToggleTheme={toggleTheme} />
 
-      <main ref={mainRef} className="flex flex-1 flex-col gap-10 px-6 py-16 lg:flex-row lg:gap-6">
+      <main
+        ref={mainRef}
+        className="flex min-h-0 flex-1 flex-col gap-10 overflow-y-auto px-6 py-16 lg:flex-row lg:gap-6"
+      >
         <div className="flex flex-1 flex-col gap-10">
           <div
             className="flex flex-col gap-10"

@@ -256,6 +256,24 @@ pushing the footer off-screen — the right side to give up, since a
 half-faded label near the edge of its visibility range is a smaller loss
 than the footer becoming unreachable without scrolling.
 
+**That `65vh` cap narrowed the problem, it didn't close it.** Feedback:
+"due to the nature of the scrolling on home page, you can't see the footer
+because it is slightly larger than screen height." The page's root was
+`min-h-screen` — a *floor*, not a ceiling — so whenever the combined
+content (header + hero/grid + spinner) needed even a little more than
+100vh, the whole flex column grew past the viewport and the footer sat
+below the fold, requiring a page scroll to reach. `Home.tsx`'s root is now
+`h-dvh overflow-hidden` (a fixed target equal to the real viewport height,
+`dvh` rather than `vh` so it accounts for mobile browser chrome) instead
+of `min-h-screen`, with `main` given `flex-1 min-h-0 overflow-y-auto`:
+header and footer keep their natural heights, `main` gets exactly
+whatever's left, and if its own content still doesn't fit, *it* scrolls
+internally rather than displacing the footer. The footer is now always
+on-screen without scrolling the page to see it, at the cost of an
+internal scrollbar on `main` in the rare case content still overflows —
+the right side to give up here too, for the same reason as the `vh` cap
+above.
+
 **`CategoryTreeNav`** (header) went from a Khan Academy–style topic tree to
 a bubble picker — a full redesign, not a tweak. The original was a fixed
 left list of category names and a right pane showing the selected one's
@@ -330,6 +348,56 @@ background is low-contrast to the point of being hard to read — "for now"
 in the feedback is read literally, so this hasn't been fixed
 unilaterally. Revisit if asked, e.g. theme-conditional text color or an
 outline/shadow behind the label.
+
+**The header hover dropdown came back, alongside the `/categories` page,
+not instead of it.** Feedback after the above: "when you hover on
+categories button, show the dropdown like before (same hover effects)."
+`CategoryTreeNav.tsx` is restored close to its pre-deletion form — same
+pastel fill, same grey hover-backdrop circle, same hover-a-bubble-to-
+preview-its-visuals pane — with one change: it now opens on hovering the
+header's "Categories" link itself (`onMouseEnter`/`onMouseLeave` on the
+wrapping container) instead of a click that toggled `open` state, so
+browsing doesn't cost a click just to see it. The link inside stays a real
+`Link` to `/categories`, so clicking it (rather than a bubble) goes to the
+dedicated page instead of doing nothing. `SiteHeader` fetches `categories`
+again to hand to it, same as before the dropdown was deleted — falling
+back to a plain link to `/categories` while that fetch is loading or
+failed, so the header never has nothing to click. Two surfaces doing
+overlapping jobs (a quick hover preview vs. a full clustered page) was a
+deliberate answer to the ask, not an oversight: the dropdown is for a
+glance without leaving the page, the page is the "embedded chart" asked
+for two rounds ago — neither replaces the other now.
+
+**Bubble clustering on `/categories`: a small circle-packing relaxation,
+not a grid.** Feedback: "I want the bubbles to be more clustered and
+layered... like a poster... restricted on left and right by 20%, and 5%
+top and 10% bottom whitespace" (a rough gloss on the attached Pareto-cluster
+reference image — variously sized circles clustered together, some
+overlapping — used for the *arrangement*, not a pixel spec). `CategoryBubbleChart`
+measures its own container (`ResizeObserver`, no dependency needed —
+`clientWidth`/`clientHeight` in pixels) and computes a bounding box inset
+by those margins (`MARGIN_X = 0.2`, `MARGIN_TOP = 0.05`,
+`MARGIN_BOTTOM = 0.1`) — in pixels off the *measured* box, not CSS
+percentage padding, since percentage `padding-top`/`padding-bottom` is
+defined relative to the containing block's *width* in CSS, not its height,
+which would have made the top/bottom margins wrong on anything but a
+square container.
+
+No d3-force dependency (still deferred, per §2 below) — `packBubbles` is a
+from-scratch minimal relaxation: bubbles seed along a golden-angle
+(phyllotaxis) spiral scaled to the box, biggest category nearest center
+(sorted descending by `publishedCount`), then a fixed number of passes
+nudges every overlapping pair apart along the line between their centers
+and clamps every bubble back inside the margin box. Enough passes settles
+into a tight, mostly non-overlapping cluster; because the box is
+deliberately restricted, there usually isn't room for every bubble to
+fully separate — the residual overlap *is* the "layered" look asked for,
+not a bug the relaxation failed to resolve. Bubbles keep their existing
+no-fill/white-text styling from the round above unchanged — this decision
+is about placement, not appearance — so overlapping ones show only
+crossing outlines and each other's own centered label, which stays
+legible because the labels don't share a center even when the circles do
+overlap.
 
 **Category restructuring (e.g. introducing "Math" as a parent of "Physics")
 is explicitly not decided.** `topics` nest *within* a category; they don't

@@ -108,14 +108,17 @@ Do not weaken these without an explicit decision recorded in `docs/DECISIONS.md`
 - **Navigation** is two surfaces: a discrete, wheel/arrow-key-driven category
   spinner (home page — see `docs/DECISIONS.md`) with a dot marker colored to
   match whichever category is active, and a "Categories" link in the header
-  that goes to its own page (`/categories`) showing every category as an
-  embedded bubble chart — outlined circles, no fill, sized by published-visual
-  count, white text, click one to go to its page. The spinner never navigates
-  by itself — "See more" on the home page's preview grid is its one link into
-  a category's full page (`/c/:slug`). While that page is open, the header
-  link reads "Category: <name>" instead of "Categories," and a "← Home" link
-  on the page returns to the spinner with that same category selected, not
-  reset to the unselected state.
+  that both opens a hover dropdown (every category as a small pastel-filled
+  bubble, hover one to preview its visuals on the right, click one to go to
+  its page) and, on click, goes to its own dedicated page (`/categories`)
+  showing every category as a larger embedded bubble chart — outlined
+  circles, no fill, white text, clustered and overlapping inside a bounded
+  frame rather than spread evenly. The spinner never navigates by itself —
+  "See more" on the home page's preview grid is its one link into a
+  category's full page (`/c/:slug`). While a category page is open, the
+  header link reads "Category: <name>" instead of "Categories," and a
+  "← Home" link on the page returns to the spinner with that same category
+  selected, not reset to the unselected state.
 - **"Full screen"** means an expanded-layout toggle, never the browser Fullscreen
   API — it behaves inconsistently and traps keyboard handling.
 
